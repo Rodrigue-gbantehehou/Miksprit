@@ -115,27 +115,41 @@ final class AdminController extends AbstractController
         $existingOrganization = $this->entityManager->getRepository(Organization::class)->findOneBy(['slug' => $slug]);
         if ($existingOrganization instanceof Organization) {
             if ($existingOwner instanceof User) {
-                $membershipStatus = $this->entityManager->getConnection()->fetchOne(
-                    'SELECT status FROM tenant_memberships WHERE tenant_id = ? AND user_id = ?',
-                    [$existingOrganization->tenantId()->value, $existingOwner->id()],
-                );
+                $membership = $this->entityManager->createQueryBuilder()
+                    ->select('membership')
+                    ->from(Membership::class, 'membership')
+                    ->where('membership.tenantId.value = :tenantId')
+                    ->andWhere('membership.userId = :userId')
+                    ->setParameter('tenantId', $existingOrganization->tenantId()->value)
+                    ->setParameter('userId', $existingOwner->id())
+                    ->getQuery()
+                    ->getOneOrNullResult();
 
-                if ($membershipStatus === \App\Entity\MembershipStatus::Invited->value) {
-                    try {
-                        $accountLinks->sendInvitation($existingOwner);
-                    } catch (\Throwable) {
-                        $this->record('admin.owner.invitation_resend_failed', $existingOrganization->id);
-                        return $this->json(['error' => 'Le propriétaire existe déjà, mais le renvoi du courriel a échoué. Réessayez dans quelques instants.'], 503, ['Cache-Control' => 'no-store']);
+                if ($membership instanceof Membership && $membership->status() === \App\Entity\MembershipStatus::Invited) {
+                    if (!$existingOwner->isActive()) {
+                        return $this->json(['error' => 'Ce compte est désactivé. Réactivez-le avant de lui attribuer cet espace.'], 409, ['Cache-Control' => 'no-store']);
                     }
-
-                    $this->record('admin.owner.invitation_resent', $existingOrganization->id);
+                    $this->entityManager->wrapInTransaction(function (EntityManagerInterface $entityManager) use ($membership, $existingOwner, $accountLinks): void {
+                        $membership->accept($existingOwner->id());
+                        $accountLinks->invalidateInvitationLinks($existingOwner);
+                    });
+                    $this->record('admin.owner.membership_activated', $existingOrganization->id);
                     return $this->json([
-                        'message' => 'Cette invitation était déjà créée. Un nouveau lien vient d’être envoyé.',
+                        'message' => 'Le compte existant est maintenant propriétaire de cette organisation. Il peut se connecter et créer son site.',
                         'userId' => $existingOwner->id(),
                         'tenantId' => $existingOrganization->id,
                         'email' => $email,
-                        'membershipStatus' => 'invited',
-                    ], 202, ['Cache-Control' => 'no-store, private']);
+                        'membershipStatus' => 'active',
+                    ], 200, ['Cache-Control' => 'no-store, private']);
+                }
+                if ($membership instanceof Membership && $membership->status() === \App\Entity\MembershipStatus::Active) {
+                    return $this->json([
+                        'message' => 'Ce compte est déjà propriétaire actif de cette organisation.',
+                        'userId' => $existingOwner->id(),
+                        'tenantId' => $existingOrganization->id,
+                        'email' => $email,
+                        'membershipStatus' => 'active',
+                    ], 200, ['Cache-Control' => 'no-store, private']);
                 }
             }
 
@@ -143,28 +157,45 @@ final class AdminController extends AbstractController
         }
 
         $owner = $existingOwner;
-        if (!$owner instanceof User) {
+        $newAccount = !($owner instanceof User);
+        if ($newAccount) {
             $owner = User::create(bin2hex(random_bytes(16)), $email, 'pending');
             $owner->setPassword($passwordHasher->hashPassword($owner, bin2hex(random_bytes(32))));
+        } elseif (!$owner->isActive()) {
+            return $this->json(['error' => 'Ce compte est désactivé. Réactivez-le avant de lui attribuer cet espace.'], 409, ['Cache-Control' => 'no-store']);
         }
         $tenantId = new TenantId(bin2hex(random_bytes(16)));
         $organization = Organization::create($tenantId, $organizationName, $slug);
-        $membership = Membership::invite(bin2hex(random_bytes(16)), $tenantId, $owner->id(), \App\Entity\TenantRole::Owner);
-        $this->entityManager->wrapInTransaction(function (EntityManagerInterface $entityManager) use ($owner, $organization, $membership, $users): void {
+        $membership = $newAccount
+            ? Membership::invite(bin2hex(random_bytes(16)), $tenantId, $owner->id(), \App\Entity\TenantRole::Owner)
+            : Membership::owner(bin2hex(random_bytes(16)), $tenantId, $owner->id());
+        $this->entityManager->wrapInTransaction(function (EntityManagerInterface $entityManager) use ($owner, $organization, $membership, $newAccount): void {
             $entityManager->persist($organization);
             $entityManager->persist($membership);
-            $users->save($owner);
+            if ($newAccount) {
+                $entityManager->persist($owner);
+            }
         });
 
-        try {
-            $accountLinks->sendInvitation($owner);
-        } catch (\Throwable) {
-            $this->record('admin.owner.invitation_email_failed', $tenantId->value);
-            return $this->json(['error' => 'The owner and organization were created, but the invitation could not be sent. Retry delivery from account management.'], 503);
+        if ($newAccount) {
+            try {
+                $accountLinks->sendInvitation($owner);
+            } catch (\Throwable) {
+                $this->record('admin.owner.invitation_email_failed', $tenantId->value);
+                return $this->json(['error' => 'L’organisation est créée, mais le courriel d’invitation n’a pas pu être envoyé. Un administrateur peut renvoyer l’invitation.'], 503, ['Cache-Control' => 'no-store']);
+            }
         }
-        $this->record('admin.owner.invited', $tenantId->value);
+        $this->record($newAccount ? 'admin.owner.invited' : 'admin.owner.created_for_existing_account', $tenantId->value);
 
-        return $this->json(['userId' => $owner->id(), 'tenantId' => $tenantId->value, 'email' => $email, 'membershipStatus' => 'invited'], 201, ['Cache-Control' => 'no-store, private']);
+        return $this->json([
+            'message' => $newAccount
+                ? 'Organisation créée. Un lien a été envoyé au propriétaire pour définir son mot de passe.'
+                : 'Organisation créée et accès propriétaire activé. Le propriétaire peut se connecter et créer son site.',
+            'userId' => $owner->id(),
+            'tenantId' => $tenantId->value,
+            'email' => $email,
+            'membershipStatus' => $newAccount ? 'invited' : 'active',
+        ], 201, ['Cache-Control' => 'no-store, private']);
     }
 
     #[Route('/users/{id}/status', methods: ['PATCH'])]

@@ -32,6 +32,11 @@ final readonly class AccountLinkIssuer
         $this->issue($user, AccountLinkPurpose::Invitation);
     }
 
+    public function invalidateInvitationLinks(User $user): void
+    {
+        $this->tokens->invalidateOutstanding($user->id(), AccountLinkPurpose::Invitation, new \DateTimeImmutable());
+    }
+
     private function issue(User $user, AccountLinkPurpose $purpose): void
     {
         $now = new \DateTimeImmutable();

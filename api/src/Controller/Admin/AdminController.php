@@ -111,8 +111,36 @@ final class AdminController extends AbstractController
             || preg_match('/^[a-z0-9](?:[a-z0-9-]{0,78}[a-z0-9])?$/D', $slug) !== 1) {
             return $this->json(['error' => 'Email, organizationName, or slug is invalid.'], 422);
         }
-        if ($users->findByEmail($email) !== null || $this->entityManager->getRepository(Organization::class)->findOneBy(['slug' => $slug]) !== null) {
-            return $this->json(['error' => 'The email or organization slug is already in use.'], 409);
+        $existingOwner = $users->findByEmail($email);
+        $existingOrganization = $this->entityManager->getRepository(Organization::class)->findOneBy(['slug' => $slug]);
+        if ($existingOwner !== null || $existingOrganization instanceof Organization) {
+            if ($existingOwner instanceof User && $existingOrganization instanceof Organization
+                && $existingOrganization->name() === $organizationName) {
+                $membershipStatus = $this->entityManager->getConnection()->fetchOne(
+                    'SELECT status FROM tenant_memberships WHERE tenant_id = ? AND user_id = ?',
+                    [$existingOrganization->tenantId()->value, $existingOwner->id()],
+                );
+
+                if ($membershipStatus === \App\Entity\MembershipStatus::Invited->value) {
+                    try {
+                        $accountLinks->sendInvitation($existingOwner);
+                    } catch (\Throwable) {
+                        $this->record('admin.owner.invitation_resend_failed', $existingOrganization->id);
+                        return $this->json(['error' => 'Le propriétaire existe déjà, mais le renvoi du courriel a échoué. Réessayez dans quelques instants.'], 503, ['Cache-Control' => 'no-store']);
+                    }
+
+                    $this->record('admin.owner.invitation_resent', $existingOrganization->id);
+                    return $this->json([
+                        'message' => 'Cette invitation était déjà créée. Un nouveau lien vient d’être envoyé.',
+                        'userId' => $existingOwner->id(),
+                        'tenantId' => $existingOrganization->id,
+                        'email' => $email,
+                        'membershipStatus' => 'invited',
+                    ], 202, ['Cache-Control' => 'no-store, private']);
+                }
+            }
+
+            return $this->json(['error' => 'Un compte ou cet identifiant d’organisation existe déjà. Vérifiez la liste des comptes et renvoyez l’invitation si elle est en attente.'], 409, ['Cache-Control' => 'no-store']);
         }
 
         $owner = User::create(bin2hex(random_bytes(16)), $email, 'pending');

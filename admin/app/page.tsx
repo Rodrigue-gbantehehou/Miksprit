@@ -86,8 +86,8 @@ function UsersPanel({ result, reload }: { result: ApiResult<AdminUser[]>; reload
     const element = event.currentTarget;
     const form = new FormData(element);
     try {
-      await api.inviteOwner({ email: String(form.get("email")), organizationName: String(form.get("organizationName")), slug: String(form.get("slug")) });
-      element.reset(); setMessage("Invitation envoyée au propriétaire."); reload();
+      const result = await api.inviteOwner({ email: String(form.get("email")), organizationName: String(form.get("organizationName")), slug: String(form.get("slug")) });
+      element.reset(); setMessage(result.message ?? "Invitation envoyée au propriétaire."); reload();
     } catch (error) { setMessage(error instanceof Error ? error.message : "L’invitation a échoué."); }
     finally { setBusy(false); }
   }

@@ -51,6 +51,9 @@ async function write<T>(path: string, method: "POST" | "PATCH", payload: Record<
   const response = await fetch(`${API_BASE}${path}`, { method, credentials: "same-origin", cache: "no-store", headers: { Accept: "application/json", "Content-Type": "application/json" }, body: JSON.stringify({ ...payload, _csrf_token: csrf.adminWriteCsrfToken }) });
   if (response.status === 401) { redirectToCentralLogin(); throw new Error("Session expirée."); }
   const result = await response.json().catch(() => ({})) as T & { error?: string };
+  if (response.status === 409 && path === "/admin/users") {
+    throw new Error("Un compte ou cet identifiant d’organisation existe déjà. Vérifie la liste des comptes et renvoie l’invitation si elle est en attente.");
+  }
   if (!response.ok) throw new Error(result.error ?? `L’API a répondu avec le statut ${response.status}.`);
   return result;
 }
@@ -78,7 +81,7 @@ export const api = {
   audit: (signal?: AbortSignal) => apiResource<AuditEvent[]>("/admin/audit", signal),
   operations: (signal?: AbortSignal) => apiResource<OperationalStatus[]>("/admin/operations", signal),
   users: (signal?: AbortSignal) => apiResource<AdminUser[]>("/admin/users", signal),
-  inviteOwner: (payload: { email: string; organizationName: string; slug: string }) => write<{ userId: string }>('/admin/users', 'POST', payload),
+  inviteOwner: (payload: { email: string; organizationName: string; slug: string }) => write<{ userId: string; message?: string }>('/admin/users', 'POST', payload),
   setUserActive: (id: string, active: boolean) => write<{ id: string; email: string; active: boolean }>(`/admin/users/${encodeURIComponent(id)}/status`, 'PATCH', { active }),
   resendInvitation: (id: string) => write<{ status: string }>(`/admin/users/${encodeURIComponent(id)}/invitation`, 'POST', {}),
 };

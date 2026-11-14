@@ -10,8 +10,10 @@ $env:API_INTERNAL_BASE="http://127.0.0.1:8000"
 $env:NEXT_PUBLIC_API_BASE="/api/v1"
 $env:NEXT_PUBLIC_CLIENT_APP_URL="http://localhost:3000"
 $env:NEXT_PUBLIC_ADMIN_APP_URL="http://localhost:3001"
-npm run dev -- --port 3002
+npm run dev
 ```
+
+La vitrine et la connexion centrale sont servies sur `http://localhost:3002`; le parcours de création de compte est à `http://localhost:3002/inscription`. L'application propriétaire `client/` utilise le port 3000 et `admin/` le port 3001.
 
 Les variables `NEXT_PUBLIC_*` ne contiennent aucun secret. Le navigateur appelle l’API via le proxy Next same-origin, qui transmet `/api/v1/*` à `API_INTERNAL_BASE`.
 

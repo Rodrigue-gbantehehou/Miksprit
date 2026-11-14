@@ -127,6 +127,7 @@ export default function Home() {
 
   const current = titles[section];
   const apiAvailable = health.state === "connected" && health.data.status === "ok";
+  const needsWorkspace = organizations.state === "connected" && organizations.data.length === 0;
 
   return (
     <div className="app-shell">
@@ -139,14 +140,14 @@ export default function Home() {
         </a>
         <div className="workspace-label">ESPACE PROPRIÉTAIRE</div>
         <Separator className="workspace-separator" />
-        <nav id="owner-navigation" aria-label="Navigation principale">
+        {needsWorkspace ? <p className="workspace-empty">Créez votre espace pour commencer.</p> : <nav id="owner-navigation" aria-label="Navigation principale">
           {navigation.map((item) => (
             <Button key={item.id} type="button" variant="ghost" className={`nav-item ${section === item.id ? "active" : ""}`} aria-label={item.label} title={sidebarCollapsed ? item.label : undefined} aria-current={section === item.id ? "page" : undefined} onClick={() => setSection(item.id)}>
               <item.icon className="nav-icon" size={17} aria-hidden /><span className="nav-label">{item.label}</span>
               <ChevronRight className="nav-arrow" size={15} aria-hidden />
             </Button>
           ))}
-        </nav>
+        </nav>}
         <div className="sidebar-bottom">
           <div className="profile"><div className="avatar" aria-hidden="true">P</div><div className="profile-copy"><strong>Compte propriétaire</strong><small>Authentification requise</small></div><span className="more">···</span></div>
         </div>
@@ -154,11 +155,15 @@ export default function Home() {
 
       <main className={`main-area ${sidebarCollapsed ? "is-collapsed" : ""}`} id="home">
         <header className="topbar">
-          <div className="breadcrumbs"><span>Espace propriétaire</span><span className="crumb-sep">/</span><strong>{current.title}</strong></div>
+          <div className="breadcrumbs"><span>Espace propriétaire</span><span className="crumb-sep">/</span><strong>{needsWorkspace ? "Créer mon espace" : current.title}</strong></div>
           <div className="top-actions"><span className={`api-indicator ${apiAvailable ? "connected" : "offline"}`} role="status"><i />{apiAvailable ? "API disponible" : "API indisponible"}</span><Button variant="outline" size="icon" type="button" aria-label="Notifications"><Activity size={16} aria-hidden /></Button><div className="avatar avatar-small">P</div></div>
         </header>
 
         <div className="content">
+          {needsWorkspace ? <>
+            <section className="page-heading"><div><p className="overline">MIKSPRIT · ESPACE PRO</p><h1>Créer mon espace Miksprit</h1><p>Votre compte est prêt. Donnez un nom à votre activité, puis ajoutez votre premier site Wi-Fi.</p></div><Button onClick={() => void reload()} disabled={loading}>Actualiser</Button></section>
+            <CreateWorkspaceView onCreated={reload} />
+          </> : <>
           <section className="page-heading"><div><p className="overline">MIKSPRIT · ESPACE PRO</p><h1>{current.title}</h1><p>{current.description}</p></div><div className="heading-actions"><label className="tenant-picker-label" htmlFor="owner-tenant">Organisation</label><select id="owner-tenant" className="tenant-picker" value={selectedTenantId} disabled={organizations.state !== "connected" || organizations.data.length < 2} onChange={(event) => { const id = event.currentTarget.value; selectedTenantRef.current = id; setOwnerTenant(id || null); setSelectedTenantId(id); void reload(); }} aria-label="Organisation active"><option value="">Choisir une organisation</option>{organizations.state === "connected" && organizations.data.map((organization) => <option key={organization.id} value={organization.id}>{organization.name} · {organization.role}</option>)}</select><Button asChild variant="outline"><a href="/portal/">Portail captif</a></Button><Button onClick={() => void reload()} disabled={loading}><span aria-hidden="true">↻</span>{loading ? "Actualisation…" : "Actualiser"}</Button></div></section>
 
           {section === "dashboard" && <DashboardView result={dashboard} reload={() => void reload()} />}
@@ -167,12 +172,40 @@ export default function Home() {
           {section === "routers" && <RoutersView result={routers} sites={sites} reload={() => void reload()} />}
           {section === "transactions" && <TransactionsView result={transactions} reload={() => void reload()} />}
           {section === "payouts" && <PayoutsView result={payouts} reload={() => void reload()} hasTenant={Boolean(selectedTenantId)} />}
+          </>}
 
           <footer className="content-footer"><span>© 2026 Miksprit</span><span><i className="footer-dot" /> Les données sont chargées depuis votre API</span></footer>
         </div>
       </main>
     </div>
   );
+}
+
+function CreateWorkspaceView({ onCreated }: { onCreated: () => Promise<void> }) {
+  const [busy, setBusy] = useState(false);
+  const [error, setError] = useState("");
+
+  async function create(event: React.FormEvent<HTMLFormElement>) {
+    event.preventDefault();
+    const form = event.currentTarget;
+    const data = new FormData(form);
+    setBusy(true);
+    setError("");
+    try {
+      await api.createOrganization({ name: String(data.get("name") ?? ""), slug: String(data.get("slug") ?? "") });
+      await onCreated();
+    } catch (cause) {
+      setError(cause instanceof Error ? cause.message : "La création de votre espace a échoué.");
+    } finally {
+      setBusy(false);
+    }
+  }
+
+  return <CreatePanel title="Votre espace propriétaire" description="Votre compte en devient propriétaire immédiatement. Aucun lien d’invitation n’est nécessaire." error={error} onSubmit={(event) => void create(event)}>
+    <input name="name" aria-label="Nom de l’activité" placeholder="Nom de votre activité" maxLength={160} required />
+    <input name="slug" aria-label="Identifiant URL" placeholder="identifiant-de-votre-espace" pattern={SITE_SLUG_PATTERN} maxLength={80} required />
+    <Button type="submit" disabled={busy}>{busy ? "Création…" : "Créer mon espace"}</Button>
+  </CreatePanel>;
 }
 
 function DashboardView({ result, reload }: { result: ApiResult<DashboardSummary>; reload: () => void }) {

@@ -59,12 +59,14 @@ button { font: inherit; }
 .brand-mark { width: 34px; height: 34px; display: grid; place-items: center; border-radius: 10px; color: white; background: var(--green); font-size: 17px; }
 .workspace-label { margin: 45px 10px 13px; color: #9ba6a1; font-size: 9px; font-weight: 700; letter-spacing: 1.15px; }
 .workspace-separator { margin: 0 10px 9px; width: auto; }
+.workspace-empty { margin: 16px 10px; color: #7c8b85; font-size: 12px; line-height: 1.6; }
 .sidebar, .main-area { transition: width .18s ease, margin-left .18s ease; }
 .sidebar-toggle { position: absolute; top: 18px; right: -16px; z-index: 7; width: 32px !important; height: 32px !important; border-radius: 50% !important; background: #fff !important; box-shadow: 0 2px 8px #172d271a; }
 .sidebar.is-collapsed { width: 76px; padding-inline: 12px; }
 .main-area.is-collapsed { margin-left: 76px; }
 .sidebar.is-collapsed .brand { justify-content: center; padding-inline: 0; }
 .sidebar.is-collapsed .brand-name, .sidebar.is-collapsed .workspace-label, .sidebar.is-collapsed .help-card, .sidebar.is-collapsed .profile-copy, .sidebar.is-collapsed .profile .more { display: none; }
+.sidebar.is-collapsed .workspace-empty { display: none; }
 .sidebar.is-collapsed .workspace-separator { margin: 18px 4px 12px; }
 .sidebar.is-collapsed nav { gap: 7px; }
 .sidebar.is-collapsed .nav-item { grid-template-columns: 1fr; justify-items: center; gap: 0; padding-inline: 0; }

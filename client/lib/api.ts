@@ -59,8 +59,8 @@ async function get<T>(path: string, signal?: AbortSignal): Promise<T> {
 }
 
 async function write<T>(path: string, method: "POST" | "PATCH", payload: Record<string, unknown>, idempotencyKey?: string): Promise<T> {
-  if (path.startsWith("/owner/") && !selectedTenantId) {
-    throw new Error("Ce compte n’est lié à aucune organisation active. Un administrateur de la plateforme doit d’abord vous inviter comme propriétaire.");
+  if (path.startsWith("/owner/") && path !== "/owner/organizations" && !selectedTenantId) {
+    throw new Error("Créez votre espace Miksprit avant d’ajouter un site ou un forfait.");
   }
   const csrfResponse = await fetch(`${API_BASE}/auth/csrf`, { credentials: "same-origin", cache: "no-store", headers: { Accept: "application/json" } });
   if (!csrfResponse.ok) throw new Error("Impossible de vérifier votre accès.");
@@ -92,6 +92,7 @@ export async function apiResource<T>(path: string, signal?: AbortSignal): Promis
 export const api = {
   health: (signal?: AbortSignal) => apiResource<ApiHealth>("/health", signal),
   organizations: (signal?: AbortSignal) => apiResource<OwnerOrganization[]>("/owner/organizations", signal),
+  createOrganization: (payload: { name: string; slug: string }) => write<{ id: string; name: string; slug: string; role: string }>("/owner/organizations", "POST", payload),
   dashboard: (signal?: AbortSignal) => apiResource<DashboardSummary>("/owner/dashboard", signal),
   sites: (signal?: AbortSignal) => apiResource<Site[]>("/owner/sites", signal),
   plans: (signal?: AbortSignal) => apiResource<Plan[]>("/owner/plans", signal),

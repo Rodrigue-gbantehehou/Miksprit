@@ -6,6 +6,8 @@ namespace App\Controller\Owner;
 
 use App\Entity\User;
 use App\Service\Owner\OwnerReadService;
+use App\Service\Owner\CreateOwnerOrganization;
+use App\Service\Owner\OwnerOrganizationConflict;
 use App\Service\Owner\OwnerTenantContextUnavailable;
 use App\Service\Owner\OwnerWriteService;
 use App\Service\Auth\CsrfCookieManager;
@@ -73,6 +75,37 @@ final class OwnerReadController extends AbstractController
         }
 
         return $this->json($this->reads->organizationsForActor($actor->id()), 200, ['Cache-Control' => 'no-store, private']);
+    }
+
+    #[Route('/organizations', name: 'organization_create', methods: ['POST'])]
+    public function createOrganization(Request $request, CsrfCookieManager $csrf, CreateOwnerOrganization $create): JsonResponse
+    {
+        $actor = $this->getUser();
+        if (!$actor instanceof User) {
+            return $this->json(['error' => 'Authentication required.'], 401, ['Cache-Control' => 'no-store']);
+        }
+        try {
+            $data = $request->toArray();
+        } catch (\Throwable) {
+            return $this->json(['error' => 'Une requête JSON valide est nécessaire.'], 400, ['Cache-Control' => 'no-store']);
+        }
+        if (!$csrf->isValid($request, $data)) {
+            return $this->json(['error' => 'Jeton de sécurité invalide.'], 403, ['Cache-Control' => 'no-store']);
+        }
+
+        try {
+            $organization = $create->execute(
+                $actor->id(),
+                is_string($data['name'] ?? null) ? $data['name'] : '',
+                is_string($data['slug'] ?? null) ? $data['slug'] : '',
+            );
+        } catch (\InvalidArgumentException $exception) {
+            return $this->json(['error' => $exception->getMessage()], 422, ['Cache-Control' => 'no-store']);
+        } catch (OwnerOrganizationConflict $exception) {
+            return $this->json(['error' => $exception->getMessage()], 409, ['Cache-Control' => 'no-store']);
+        }
+
+        return $this->json($organization, 201, ['Cache-Control' => 'no-store, private']);
     }
 
     #[Route('/sites', name: 'site_create', methods: ['POST'])]
@@ -157,7 +190,7 @@ final class OwnerReadController extends AbstractController
         } catch (OwnerTenantSelectionRequired) {
             return $this->json(['error' => 'Organization selection is required.', 'code' => 'tenant_selection_required'], 409, ['Cache-Control' => 'no-store, private']);
         } catch (OwnerTenantContextUnavailable) {
-            return $this->json(['error' => 'Votre compte n’est associé à aucune organisation active. Un administrateur de la plateforme doit vous inviter comme propriétaire.', 'code' => 'owner_tenant_unavailable'], 403, ['Cache-Control' => 'no-store, private']);
+            return $this->json(['error' => 'Aucun espace actif n’est associé à ce compte. Créez votre espace Miksprit depuis la console propriétaire.', 'code' => 'owner_tenant_unavailable'], 403, ['Cache-Control' => 'no-store, private']);
         } catch (\InvalidArgumentException $exception) {
             return $this->json(['error' => $exception->getMessage()], 422, ['Cache-Control' => 'no-store, private']);
         } catch (\DomainException $exception) {
@@ -195,7 +228,7 @@ final class OwnerReadController extends AbstractController
         } catch (OwnerTenantSelectionRequired) {
             return $this->json(['error' => 'Organization selection is required.', 'code' => 'tenant_selection_required'], 409, ['Cache-Control' => 'no-store, private']);
         } catch (OwnerTenantContextUnavailable) {
-            return $this->json(['error' => 'Votre compte n’est associé à aucune organisation active. Un administrateur de la plateforme doit vous inviter comme propriétaire.', 'code' => 'owner_tenant_unavailable'], 403, ['Cache-Control' => 'no-store, private']);
+            return $this->json(['error' => 'Aucun espace actif n’est associé à ce compte. Créez votre espace Miksprit depuis la console propriétaire.', 'code' => 'owner_tenant_unavailable'], 403, ['Cache-Control' => 'no-store, private']);
         } catch (\DomainException $exception) {
             $status = str_contains($exception->getMessage(), 'Access denied') ? 403 : 404;
             return $this->json(['error' => $status === 403 ? 'Access denied.' : 'Tenant context not found.'], $status, ['Cache-Control' => 'no-store, private']);

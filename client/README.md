@@ -32,7 +32,7 @@ npm run dev
 
 Si `/api/v1/health` renvoie 500, consultez la sortie du serveur Symfony et `api/var/log/dev.log` : ce contrôleur ne dépend pas de la base de données, donc un 500 indique généralement une erreur de démarrage/configuration/runtime ou un autre processus répondant sur le port. Si une route propriétaire renvoie 404, vérifiez que le backend du port 8000 est bien cette version (`cd api; php bin/console debug:router api_owner_site_create`) et que Next pointe sur le bon port. Les mutations propriétaire nécessitent ensuite une session JWT valide et un jeton CSRF.
 
-Un `403 owner_tenant_unavailable` signifie que le compte connecté n'a pas d'appartenance propriétaire active. Depuis `admin/`, un super-administrateur doit inviter le propriétaire avec son organisation; le propriétaire accepte le lien envoyé par courriel, puis se reconnecte dans `client/`. Le compte super-administrateur ne reçoit pas automatiquement un tenant et ne doit pas contourner cette isolation.
+Quand le compte connecté n’a encore aucun espace actif, la console affiche le formulaire « Créer mon espace Miksprit ». Le compte connecté crée son organisation et reçoit immédiatement le rôle propriétaire; aucune invitation n’est nécessaire. Les liens d’invitation restent réservés aux nouveaux comptes dont le mot de passe doit être défini. Un compte super-administrateur ne reçoit pas automatiquement un espace, mais peut en créer un comme tout autre compte authentifié.
 
 ## Routes
 

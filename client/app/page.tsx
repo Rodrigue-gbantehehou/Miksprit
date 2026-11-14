@@ -1,17 +1,17 @@
 "use client";
 
 import { useCallback, useEffect, useRef, useState } from "react";
-import { api, setOwnerTenant, type ApiHealth, type ApiResult, type DashboardSummary, type OwnerOrganization, type Plan, type Router, type RouterDriver, type Site, type Transaction } from "@/lib/api";
+import { api, setOwnerTenant, type ApiHealth, type ApiResult, type DashboardSummary, type OwnerOrganization, type PayoutOverview, type Plan, type Router, type RouterDriver, type Site, type Transaction } from "@/lib/api";
 
 const SITE_SLUG_PATTERN = "[a-z0-9]([a-z0-9\\x2d]{0,78}[a-z0-9])?";
 import { Badge as UiBadge } from "@/components/ui/badge";
 import { Button } from "@/components/ui/button";
 import { Card, CardContent, CardDescription, CardHeader, CardTitle } from "@/components/ui/card";
 import { Separator } from "@/components/ui/separator";
-import { Activity, ChevronLeft, ChevronRight, CircleHelp, LayoutDashboard, MapPin, Router as RouterIcon, Wallet, Wifi } from "lucide-react";
+import { Activity, Banknote, ChevronLeft, ChevronRight, CircleHelp, LayoutDashboard, MapPin, Router as RouterIcon, Wallet, Wifi } from "lucide-react";
 import type { LucideIcon } from "lucide-react";
 
-type Section = "dashboard" | "sites" | "plans" | "routers" | "transactions";
+type Section = "dashboard" | "sites" | "plans" | "routers" | "transactions" | "payouts";
 
 const navigation: { id: Section; label: string; icon: LucideIcon }[] = [
   { id: "dashboard", label: "Vue d’ensemble", icon: LayoutDashboard },
@@ -19,6 +19,7 @@ const navigation: { id: Section; label: string; icon: LucideIcon }[] = [
   { id: "plans", label: "Forfaits", icon: Wifi },
   { id: "routers", label: "Routeurs", icon: RouterIcon },
   { id: "transactions", label: "Transactions", icon: Wallet },
+  { id: "payouts", label: "Reversements", icon: Banknote },
 ];
 
 const titles: Record<Section, { title: string; description: string }> = {
@@ -27,6 +28,7 @@ const titles: Record<Section, { title: string; description: string }> = {
   plans: { title: "Forfaits", description: "Configurez les offres proposées à vos clients." },
   routers: { title: "Routeurs", description: "Surveillez vos équipements MikroTik enrôlés." },
   transactions: { title: "Transactions", description: "Consultez les paiements et leur état de traitement." },
+  payouts: { title: "Reversements", description: "Suivez le solde opérateur et demandez un versement Mobile Money." },
 };
 
 const empty: ApiResult<never> = { state: "unavailable", message: "Chargement des données…" };
@@ -62,6 +64,7 @@ export default function Home() {
   const [plans, setPlans] = useState<ApiResult<Plan[]>>(empty);
   const [routers, setRouters] = useState<ApiResult<Router[]>>(empty);
   const [transactions, setTransactions] = useState<ApiResult<Transaction[]>>(empty);
+  const [payouts, setPayouts] = useState<ApiResult<PayoutOverview>>(empty);
   const [organizations, setOrganizations] = useState<ApiResult<OwnerOrganization[]>>(empty);
   const [selectedTenantId, setSelectedTenantId] = useState("");
   const selectedTenantRef = useRef("");
@@ -78,6 +81,7 @@ export default function Home() {
       setPlans(orgs);
       setRouters(orgs);
       setTransactions(orgs);
+      setPayouts(orgs);
       setLoading(false);
       return;
     }
@@ -97,18 +101,20 @@ export default function Home() {
       setPlans(selectionRequired);
       setRouters(selectionRequired);
       setTransactions(selectionRequired);
+      setPayouts(selectionRequired);
       setLoading(false);
       return;
     }
 
-    const [d, s, p, r, t] = await Promise.all([
-      api.dashboard(), api.sites(), api.plans(), api.routers(), api.transactions(),
+    const [d, s, p, r, t, payoutData] = await Promise.all([
+      api.dashboard(), api.sites(), api.plans(), api.routers(), api.transactions(), api.payouts(),
     ]);
     setDashboard(d);
     setSites(s);
     setPlans(p);
     setRouters(r);
     setTransactions(t);
+    setPayouts(payoutData);
     setLoading(false);
   }, []);
 
@@ -160,6 +166,7 @@ export default function Home() {
           {section === "plans" && <PlansView result={plans} sites={sites} reload={() => void reload()} />}
           {section === "routers" && <RoutersView result={routers} sites={sites} reload={() => void reload()} />}
           {section === "transactions" && <TransactionsView result={transactions} reload={() => void reload()} />}
+          {section === "payouts" && <PayoutsView result={payouts} reload={() => void reload()} hasTenant={Boolean(selectedTenantId)} />}
 
           <footer className="content-footer"><span>© 2026 Miksprit</span><span><i className="footer-dot" /> Les données sont chargées depuis votre API</span></footer>
         </div>
@@ -224,9 +231,178 @@ function CreatePanel({ title, description, error, onSubmit, children }: { title:
 
 function TransactionsView({ result, reload }: { result: ApiResult<Transaction[]>; reload: () => void }) {
   if (result.state !== "connected" || result.data.length === 0) return <StatePanel result={result} onReload={reload} />;
-  return <TablePanel title="Transactions" columns={["Référence", "Montant", "Date", "État"]}>{result.data.map((transaction) => <tr key={transaction.id}><td><strong>{transaction.reference}</strong></td><td>{money(transaction.amountXof)}</td><td>{new Date(transaction.createdAt).toLocaleString("fr-FR")}</td><td><Badge value={transaction.status} /></td></tr>)}</TablePanel>;
+  const settlementLabels: Record<string, string> = { awaiting_payment: "Paiement en attente", awaiting_settlement: "Règlement en attente", available: "Disponible", needs_review: "À rapprocher" };
+  return <TablePanel title="Transactions" columns={["Référence", "Payé", "Frais FedaPay", "Commission Miksprit", "Dû opérateur", "Règlement", "État"]}>{result.data.map((transaction) => <tr key={transaction.id}><td><strong>{transaction.reference}</strong></td><td>{money(transaction.amountXof)}</td><td>{transaction.providerFeeXof === null ? "En attente" : money(transaction.providerFeeXof)}</td><td>{transaction.commissionXof === null ? "—" : money(transaction.commissionXof)}</td><td>{transaction.operatorNetXof === null ? "En attente" : money(transaction.operatorNetXof)}</td><td><Badge value={settlementLabels[transaction.settlementStatus] ?? transaction.settlementStatus} /></td><td><Badge value={transaction.status} /></td></tr>)}</TablePanel>;
 }
 
 function TablePanel({ title, columns, children }: { title: string; columns: string[]; children: React.ReactNode }) {
   return <section className="panel table-panel"><div className="panel-head"><div><h2>{title}</h2><p>Informations renvoyées par l’API du tenant actif.</p></div></div><div className="table-scroll"><table><thead><tr>{columns.map((column) => <th key={column}>{column}</th>)}</tr></thead><tbody>{children}</tbody></table></div></section>;
+}
+
+const E164_PATTERN = "\\+229[0-9]{8}";
+
+function payoutStatusLabel(status: string): string {
+  return ({
+    requested: "Demandé",
+    reserved: "Réservé",
+    processing: "En traitement",
+    pending: "En attente",
+    sent: "Versé",
+    failed: "Échec",
+    ambiguous: "À vérifier",
+  } as Record<string, string>)[status] ?? status;
+}
+
+function PayoutsView({ result, reload, hasTenant }: { result: ApiResult<PayoutOverview>; reload: () => void; hasTenant: boolean }) {
+  const [amount, setAmount] = useState("");
+  const [phoneNumber, setPhoneNumber] = useState("");
+  const [beneficiaryName, setBeneficiaryName] = useState("");
+  const [review, setReview] = useState(false);
+  const [busy, setBusy] = useState(false);
+  const [message, setMessage] = useState("");
+  const [error, setError] = useState("");
+  const idempotency = useRef<{ fingerprint: string; key: string } | null>(null);
+
+  if (result.state !== "connected") {
+    return <StatePanel result={result} onReload={reload} />;
+  }
+
+  const available = result.data.balance.availableXof;
+  const amountXof = Number(amount);
+  const fingerprint = JSON.stringify([amountXof, phoneNumber, beneficiaryName.trim()]);
+
+  function prepare(event: React.FormEvent<HTMLFormElement>) {
+    event.preventDefault();
+    setError("");
+    setMessage("");
+    if (!hasTenant) {
+      setError("Sélectionnez une organisation active pour continuer.");
+      return;
+    }
+    if (!Number.isSafeInteger(amountXof) || amountXof < 1 || amountXof > available) {
+      setError("Le montant doit être un nombre entier inférieur ou égal au solde disponible.");
+      return;
+    }
+    if (!/^\+229\d{8}$/.test(phoneNumber)) {
+      setError("Pour le moment, saisissez un numéro Mobile Money béninois au format +229XXXXXXXX.");
+      return;
+    }
+    if (beneficiaryName.trim().length < 2 || beneficiaryName.trim().length > 160) {
+      setError("Saisissez le nom du titulaire exact du compte Mobile Money.");
+      return;
+    }
+    setReview(true);
+  }
+
+  async function confirmPayout() {
+    if (busy) return;
+    setBusy(true);
+    setError("");
+    setMessage("");
+    if (idempotency.current?.fingerprint !== fingerprint) {
+      idempotency.current = { fingerprint, key: window.crypto.randomUUID() };
+    }
+    try {
+      await api.requestPayout({
+        amountXof,
+        phoneNumber,
+        beneficiaryName: beneficiaryName.trim(),
+      }, idempotency.current.key);
+      idempotency.current = null;
+      setReview(false);
+      setAmount("");
+      setPhoneNumber("");
+      setBeneficiaryName("");
+      setMessage("La demande est enregistrée et le montant est réservé. Son statut sera actualisé après confirmation du transfert.");
+      reload();
+    } catch (cause) {
+      setError(cause instanceof Error ? cause.message : "La demande de reversement n’a pas pu être enregistrée.");
+    } finally {
+      setBusy(false);
+    }
+  }
+
+  return (
+    <>
+      <section className="stat-grid" aria-label="Solde opérateur">
+        {[
+          { label: "Disponible", value: result.data.balance.availableXof },
+          { label: "Réservé", value: result.data.balance.reservedXof },
+          { label: "Déjà versé", value: result.data.balance.paidXof },
+        ].map((item) => (
+          <article className="stat-card" key={item.label}>
+            <div className="stat-label">{item.label}<span aria-hidden="true"><Banknote size={15} /></span></div>
+            <strong>{money(item.value)}</strong>
+          </article>
+        ))}
+      </section>
+
+      <section className="panel create-panel">
+        <div className="panel-head">
+          <div>
+            <h2>Demander un reversement</h2>
+            <p>Le montant demandé est réservé jusqu’à la confirmation du transfert Mobile Money.</p>
+          </div>
+        </div>
+        {!result.data.payoutsEnabled ? (
+          <p role="status">Les reversements Mobile Money ne sont pas encore activés sur le compte FedaPay de Miksprit.</p>
+        ) : !hasTenant ? (
+          <p role="status">Aucune organisation active n’est sélectionnée. La demande est indisponible.</p>
+        ) : review ? (
+          <div aria-live="polite">
+            <dl className="payout-review">
+              <div><dt>Montant demandé</dt><dd>{money(amountXof)}</dd></div>
+              <div><dt>Canal</dt><dd>Mobile Money</dd></div>
+              <div><dt>Numéro destinataire</dt><dd>{phoneNumber}</dd></div>
+              <div><dt>Titulaire déclaré</dt><dd>{beneficiaryName.trim()}</dd></div>
+            </dl>
+            <p className="payout-notice">Vérifiez le numéro et le nom du titulaire. Une fois le transfert soumis au réseau, son résultat peut nécessiter un délai de confirmation.</p>
+            {error && <p role="alert" className="form-error">{error}</p>}
+            <div className="owner-row-actions">
+              <Button type="button" variant="outline" onClick={() => { setReview(false); setError(""); }} disabled={busy}>Modifier</Button>
+              <Button type="button" onClick={() => void confirmPayout()} disabled={busy}>
+                {busy ? "Enregistrement…" : "Confirmer la demande"}
+              </Button>
+            </div>
+          </div>
+        ) : (
+          <form className="payout-form" onSubmit={prepare}>
+            <label className="payout-field" htmlFor="payout-amount">Montant à retirer (XOF)
+              <input id="payout-amount" name="amountXof" type="number" inputMode="numeric" min="1" max={available} step="1" required value={amount} onChange={(event) => { setAmount(event.currentTarget.value); setError(""); }} />
+            </label>
+            <label className="payout-field" htmlFor="payout-phone">Numéro du portefeuille
+              <input id="payout-phone" name="phoneNumber" type="tel" inputMode="tel" autoComplete="tel" placeholder="+229XXXXXXXX" pattern={E164_PATTERN} maxLength={16} required value={phoneNumber} onChange={(event) => { setPhoneNumber(event.currentTarget.value); setError(""); }} />
+            </label>
+            <label className="payout-field" htmlFor="payout-beneficiary">Nom exact du titulaire
+              <input id="payout-beneficiary" name="beneficiaryName" autoComplete="name" maxLength={160} required value={beneficiaryName} onChange={(event) => { setBeneficiaryName(event.currentTarget.value); setError(""); }} />
+            </label>
+            {error && <p role="alert" className="form-error payout-form-message">{error}</p>}
+            {message && <p role="status" className="payout-notice payout-form-message">{message}</p>}
+            <Button type="submit" disabled={!result.data.payoutsEnabled || !hasTenant || available < 1 || busy}>
+              {busy ? "Traitement…" : "Vérifier la demande"}
+            </Button>
+          </form>
+        )}
+      </section>
+
+      <section className="panel table-panel">
+        <div className="panel-head"><div><h2>Historique des demandes</h2><p>Les reversements ne sont considérés comme payés qu’après confirmation.</p></div></div>
+        {result.data.items.length === 0 ? (
+          <p role="status">Aucune demande de reversement pour cette organisation.</p>
+        ) : (
+          <div className="table-scroll"><table><thead><tr><th>Montant</th><th>Canal</th><th>Numéro</th><th>Date</th><th>État</th></tr></thead>
+            <tbody>{result.data.items.map((item) => (
+              <tr key={item.id}>
+                <td><strong>{money(item.amountXof)}</strong></td>
+                <td>Mobile Money</td>
+                <td>•••• {item.phoneLast4}</td>
+                <td>{new Date(item.createdAt).toLocaleString("fr-FR")}</td>
+                <td><Badge value={payoutStatusLabel(item.status)} /></td>
+              </tr>
+            ))}</tbody>
+          </table></div>
+        )}
+      </section>
+    </>
+  );
 }

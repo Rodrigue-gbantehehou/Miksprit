@@ -85,11 +85,18 @@ final readonly class FedaPayGateway implements PaymentProviderAdapter
         $amount = $transaction['amount'] ?? null;
         $currency = $transaction['currency']['iso'] ?? $transaction['currency'] ?? null;
         $status = $transaction['status'] ?? null;
+        $fee = $transaction['fees'] ?? null;
+        $transferred = $transaction['amount_transferred'] ?? null;
         if ((!is_string($reference) && !is_int($reference)) || (!is_string($merchantReference) && !is_int($merchantReference))
             || !is_numeric($amount) || (int) $amount < 0 || !is_string($currency) || !is_string($status)) {
             throw new PaymentProviderUnavailable('FedaPay transaction response is incomplete.');
         }
-        return new VerifiedPaymentStatus('fedapay', (string) $reference, (string) $merchantReference, new XofAmount((int) $amount), strtoupper($currency), self::mapStatus($status), new \DateTimeImmutable());
+        if (($fee !== null && (!is_numeric($fee) || (int) $fee < 0))
+            || ($transferred !== null && (!is_numeric($transferred) || (int) $transferred < 0))) {
+            throw new PaymentProviderUnavailable('FedaPay transaction settlement amounts are invalid.');
+        }
+        $isSettled = strtolower($status) === 'transferred' && $fee !== null && $transferred !== null;
+        return new VerifiedPaymentStatus('fedapay', (string) $reference, (string) $merchantReference, new XofAmount((int) $amount), strtoupper($currency), self::mapStatus($status), new \DateTimeImmutable(), $fee === null ? null : (int) $fee, $transferred === null ? null : (int) $transferred, $isSettled);
     }
 
     public function validateWebhook(string $rawBody, ?string $signature): bool { return $this->signatures->isValid($rawBody, $signature); }
@@ -99,6 +106,48 @@ final readonly class FedaPayGateway implements PaymentProviderAdapter
     private function assertAvailable(): void
     {
         if (!$this->canCreateCheckout()) throw new PaymentProviderUnavailable('FedaPay checkout and webhook verification are not configured.');
+    }
+
+    /** Create a Mobile Money payout draft. Persist the returned ID before submitting it. */
+    public function createPayoutDraft(string $name, string $email, int $amount): string
+    {
+        if (!$this->configuration->canSendPayouts()) throw new PaymentProviderUnavailable('FedaPay payouts are not enabled for this account.');
+        if ($amount < 1) {
+            throw new \InvalidArgumentException('FedaPay payout details are invalid.');
+        }
+        $parts = preg_split('/\\s+/', trim($name), 2) ?: [];
+        if (count($parts) < 2) throw new \InvalidArgumentException('A beneficiary first and last name are required.');
+        $response = $this->request('POST', '/payouts', [
+            'amount' => $amount, 'currency' => ['iso' => 'XOF'], 'mode' => 'mobile_money',
+            'customer' => ['firstname' => $parts[0], 'lastname' => $parts[1], 'email' => $email],
+        ]);
+        $payout = self::resource($response, 'payout');
+        $id = $payout['id'] ?? null;
+        if (!is_string($id) && !is_int($id)) throw new PaymentProviderUnavailable('FedaPay did not return a payout identifier.');
+        return (string) $id;
+    }
+
+    public function submitPayout(string $providerReference, string $phone): void
+    {
+        if (!$this->configuration->canSendPayouts()) throw new PaymentProviderUnavailable('FedaPay payouts are not enabled for this account.');
+        if (preg_match('/^\\+229[0-9]{8}$/D', $phone) !== 1 || preg_match('/^[0-9]+$/D', $providerReference) !== 1) {
+            throw new \InvalidArgumentException('FedaPay payout reference or Benin phone number is invalid.');
+        }
+        $this->request('PUT', '/payouts/start', [[
+            'id' => (int) $providerReference,
+            'phone_number' => ['number' => $phone, 'country' => 'BJ'],
+        ]]);
+    }
+
+    /** @return array{status:string,reference:string} */
+    public function getPayout(string $providerReference): array
+    {
+        if (!$this->configuration->canSendPayouts()) throw new PaymentProviderUnavailable('FedaPay payouts are not enabled for this account.');
+        $payload = self::resource($this->request('GET', '/payouts/'.rawurlencode($providerReference)), 'payout');
+        $id = $payload['id'] ?? $providerReference;
+        $status = $payload['status'] ?? null;
+        if ((!is_string($id) && !is_int($id)) || !is_string($status)) throw new PaymentProviderUnavailable('FedaPay payout response is incomplete.');
+        return ['status' => strtolower($status), 'reference' => (string) $id];
     }
 
     /** @param array<string, mixed>|null $payload @return array<string, mixed> */

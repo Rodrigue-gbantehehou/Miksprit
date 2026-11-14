@@ -18,12 +18,15 @@ final readonly class CreatePublicWifiCheckout
         private PublicCheckoutRepository $repository,
         private PaymentProviderRegistry $providers,
         private PaymentCheckoutSettings $settings,
+        private PlatformCommissionPolicy $commissionPolicy,
         #[Autowire('%env(PAYMENT_DEFAULT_PROVIDER)%')] private string $defaultProvider,
     ) {
     }
 
     public function execute(string $siteId, string $planId, PaymentCustomer $customer, string $idempotencyKey): PublicWifiCheckout
     {
+        // Never accept a sale whose operator balance cannot later be calculated under an agreed policy.
+        $commissionBasisPoints = $this->commissionPolicy->basisPoints();
         if (preg_match('/^[A-Za-z0-9_-]{16,128}$/D', $idempotencyKey) !== 1) throw new \InvalidArgumentException('Checkout idempotency key is invalid.');
         $keyHash = hash('sha256', $siteId."\0".$planId."\0".strtolower($customer->email)."\0".$idempotencyKey);
         $existing = $this->repository->findAttemptByCheckoutKeyHash($keyHash);
@@ -45,7 +48,7 @@ final readonly class CreatePublicWifiCheckout
         if (!$snapshot instanceof PlanSnapshot) throw new \DomainException('Published plan not found for this site.');
 
         $orderReference = bin2hex(random_bytes(32));
-        $order = new WifiOrder(bin2hex(random_bytes(16)), $orderReference, $snapshot->tenantId, $snapshot, new \DateTimeImmutable());
+        $order = new WifiOrder(bin2hex(random_bytes(16)), $orderReference, $snapshot->tenantId, $snapshot, new \DateTimeImmutable(), $commissionBasisPoints);
         $attempt = new PaymentAttempt(bin2hex(random_bytes(16)), $snapshot->tenantId, $orderReference,
             $this->defaultProvider, $snapshot->price, checkoutRequestKeyHash: $keyHash);
         $this->repository->saveOrderAndAttempt($order, $attempt);

@@ -102,9 +102,11 @@ final readonly class DoctrineOwnerReadRepository implements OwnerReadRepository
     public function transactions(TenantContext $context): array
     {
         $rows = $this->connection->fetchAllAssociative(
-            'SELECT p.id, o.public_reference, p.expected_minor_units, p.state, o.created_at
+            'SELECT p.id, o.public_reference, p.expected_minor_units, p.state, o.created_at,
+                    s.provider_fee_minor_units, s.commission_minor_units, s.operator_net_minor_units, s.state AS settlement_state
              FROM payment_attempts p
              INNER JOIN wifi_orders o ON o.tenant_id = p.tenant_id AND o.public_reference = p.order_reference
+             LEFT JOIN operator_settlements s ON s.tenant_id = o.tenant_id AND s.order_reference = o.public_reference
              WHERE p.tenant_id = :tenant
              ORDER BY o.created_at DESC, p.id DESC
              LIMIT 200',
@@ -115,6 +117,10 @@ final readonly class DoctrineOwnerReadRepository implements OwnerReadRepository
             'id' => (string) $row['id'],
             'reference' => (string) $row['public_reference'],
             'amountXof' => (int) $row['expected_minor_units'],
+            'providerFeeXof' => $row['provider_fee_minor_units'] === null ? null : (int) $row['provider_fee_minor_units'],
+            'commissionXof' => $row['commission_minor_units'] === null ? null : (int) $row['commission_minor_units'],
+            'operatorNetXof' => $row['operator_net_minor_units'] === null ? null : (int) $row['operator_net_minor_units'],
+            'settlementStatus' => (string) ($row['settlement_state'] ?? 'awaiting_payment'),
             'status' => (string) $row['state'],
             'createdAt' => (new \DateTimeImmutable((string) $row['created_at']))->format(DATE_ATOM),
         ], $rows);

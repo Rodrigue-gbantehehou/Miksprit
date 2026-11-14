@@ -1,6 +1,6 @@
 # Vitrine Miksprit et connexion centrale
 
-`landing/` contient la vitrine produit et l’unique page de connexion (`/connexion`). Les apps `client/` et `admin/` ne dupliquent pas ce formulaire : quand l’API répond 401, elles redirigent vers cette page. Après connexion, l’API indique les espaces autorisés et le landing y redirige.
+`landing/` contient la vitrine produit et l’unique page de connexion (`/connexion`). Les opérateurs peuvent ouvrir un espace depuis `/inscription`; l'organisation et le rôle Owner sont créés après vérification du courriel via `/verifier-compte`. Les apps `client/` et `admin/` ne dupliquent pas le formulaire de connexion : quand l’API répond 401, elles redirigent vers cette page.
 
 ## Développement local
 
@@ -24,9 +24,9 @@ Les variables `NEXT_PUBLIC_*` ne contiennent aucun secret. Le navigateur appelle
 - `POST /api/v1/auth/password/request` répond sans révéler si le compte existe; la demande est limitée à 5 par 15 minutes.
 - `POST /api/v1/auth/password/reset` consomme un lien d'invitation ou de réinitialisation à usage unique; mot de passe minimum 12 caractères.
 
-Le mailer Symfony utilise `MAILER_DSN` et `MAILER_FROM`; l'origine des liens est définie dans `AUTH_PUBLIC_BASE_URL`. Configure ces variables avec ton fournisseur. La valeur de développement `null://null` n'envoie aucun message. Les clés RSA de développement sont dans `api/config/jwt/` et ignorées par Git; génère une paire dédiée et définis sa passphrase hors dépôt en production. Définis les valeurs secrètes dans `api/.env.local` ou le gestionnaire de secrets de déploiement; le `.env` du dépôt ne doit contenir que des valeurs d'exemple. Il n’y a ni inscription publique, ni authentification simulée, ni JWT conservé dans `localStorage`.
+Le mailer Symfony utilise `MAILER_DSN` et `MAILER_FROM`; l'origine des liens est définie dans `AUTH_PUBLIC_BASE_URL`. Configure ces variables avec ton fournisseur. La valeur de développement `null://null` n'envoie aucun message : l'inscription ne pourra pas être finalisée tant qu'un transport mail réel n'est pas configuré. Les clés RSA de développement sont dans `api/config/jwt/` et ignorées par Git; génère une paire dédiée et définis sa passphrase hors dépôt en production. Définis les valeurs secrètes dans `api/.env.local` ou le gestionnaire de secrets de déploiement; le `.env` du dépôt ne doit contenir que des valeurs d'exemple. Le parcours d'inscription vérifié est disponible sur `/inscription`; aucune authentification n'est simulée et aucun JWT n'est conservé dans `localStorage`.
 
-Le paramètre `returnTo` n’est accepté que si son origine correspond exactement à `NEXT_PUBLIC_CLIENT_APP_URL` ou `NEXT_PUBLIC_ADMIN_APP_URL` et que l’API autorise cet espace. Les apps privées ne reçoivent donc pas de page de connexion distincte.
+L’inscription répond de façon générique afin de ne pas révéler les comptes existants. Les liens de vérification sont à usage unique et expirent après une heure. Le mot de passe est haché avant stockage du dossier de vérification; aucun utilisateur, organisation ou rôle n’est créé avant la vérification. Le paramètre `returnTo` n’est accepté que si son origine correspond exactement à `NEXT_PUBLIC_CLIENT_APP_URL` ou `NEXT_PUBLIC_ADMIN_APP_URL` et que l’API autorise cet espace.
 
 ## Déploiement
 

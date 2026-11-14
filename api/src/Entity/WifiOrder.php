@@ -39,12 +39,17 @@ final class WifiOrder implements TenantOwned
         public readonly PlanSnapshot $plan,
         #[ORM\Column(name: 'created_at', type: 'datetime_immutable')]
         public readonly \DateTimeImmutable $createdAt,
+        #[ORM\Column(name: 'platform_commission_bps', type: 'integer', nullable: true)]
+        public readonly ?int $platformCommissionBps = null,
     ) {
         if ($id === '' || $publicReference === '' || strlen($publicReference) > 160) {
             throw new \InvalidArgumentException('Order identifiers must be present and bounded.');
         }
         if (!$ownerTenantId->equals($plan->tenantId)) {
             throw new \InvalidArgumentException('Order and plan must belong to the same tenant.');
+        }
+        if ($platformCommissionBps !== null && ($platformCommissionBps < 0 || $platformCommissionBps > 10_000)) {
+            throw new \InvalidArgumentException('Platform commission policy snapshot is invalid.');
         }
     }
 

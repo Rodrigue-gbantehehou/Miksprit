@@ -13,7 +13,10 @@ export type Site = { id: string; name: string; location?: string; status: string
 export type Plan = { id: string; siteId: string; name: string; priceXof: number; sessionSeconds: number; dataLimitBytes: number | null; deviceLimit: number; durationLabel: string; status: string };
 export type Router = { id: string; name: string; siteName: string; providerCode: string; status: string; version?: string };
 export type RouterDriver = { code: string };
-export type Transaction = { id: string; reference: string; amountXof: number; status: string; createdAt: string };
+export type Transaction = { id: string; reference: string; amountXof: number; providerFeeXof: number | null; commissionXof: number | null; operatorNetXof: number | null; settlementStatus: string; status: string; createdAt: string };
+export type PayoutBalance = { availableXof: number; reservedXof: number; paidXof: number };
+export type PayoutRequest = { id: string; amountXof: number; provider: "mobile_money"; phoneLast4: string; status: string; createdAt: string };
+export type PayoutOverview = { payoutsEnabled: boolean; balance: PayoutBalance; items: PayoutRequest[] };
 export type ApiHealth = { status: string; service: string };
 export type OwnerOrganization = { id: string; name: string; role: string };
 
@@ -55,7 +58,7 @@ async function get<T>(path: string, signal?: AbortSignal): Promise<T> {
   return response.json() as Promise<T>;
 }
 
-async function write<T>(path: string, method: "POST" | "PATCH", payload: Record<string, unknown>): Promise<T> {
+async function write<T>(path: string, method: "POST" | "PATCH", payload: Record<string, unknown>, idempotencyKey?: string): Promise<T> {
   if (path.startsWith("/owner/") && !selectedTenantId) {
     throw new Error("Ce compte n’est lié à aucune organisation active. Un administrateur de la plateforme doit d’abord vous inviter comme propriétaire.");
   }
@@ -65,6 +68,7 @@ async function write<T>(path: string, method: "POST" | "PATCH", payload: Record<
   if (!csrf.csrfToken) throw new Error("Jeton de sécurité absent. Rechargez la page.");
   const headers: Record<string, string> = { Accept: "application/json", "Content-Type": "application/json" };
   if (selectedTenantId) headers["X-Tenant-ID"] = selectedTenantId;
+  if (idempotencyKey) headers["Idempotency-Key"] = idempotencyKey;
   const response = await fetch(`${API_BASE}${path}`, { method, headers, credentials: "same-origin", cache: "no-store", body: JSON.stringify({ ...payload, _csrf_token: csrf.csrfToken }) });
   if (response.status === 401) { redirectToCentralLogin(); throw new Error("Votre connexion a expiré."); }
   const result = await response.json().catch(() => ({})) as T & { error?: string };
@@ -94,6 +98,9 @@ export const api = {
   routers: (signal?: AbortSignal) => apiResource<Router[]>("/owner/routers", signal),
   routerDrivers: (signal?: AbortSignal) => apiResource<RouterDriver[]>("/owner/router-drivers", signal),
   transactions: (signal?: AbortSignal) => apiResource<Transaction[]>("/owner/transactions", signal),
+  payouts: (signal?: AbortSignal) => apiResource<PayoutOverview>("/owner/payouts", signal),
+  requestPayout: (payload: { amountXof: number; phoneNumber: string; beneficiaryName: string }, idempotencyKey: string) =>
+    write<{ id: string; amountXof: number; status: string }>("/owner/payouts", "POST", payload, idempotencyKey),
   createSite: (payload: { name: string; slug: string }) => write<{ id: string }>("/owner/sites", "POST", payload),
   createPlan: (payload: { name: string; siteId: string; priceXof: number; sessionSeconds: number; dataLimitBytes: number | null; deviceLimit: number }) => write<{ id: string }>("/owner/plans", "POST", payload),
   createRouter: (payload: { name: string; siteId: string; host: string; apiPort: number; credentialReference: string; providerCode: string }) => write<{ id: string }>("/owner/routers", "POST", payload),

@@ -17,6 +17,9 @@ final readonly class VerifiedPaymentStatus
         public string $currency,
         public PaymentState $state,
         public \DateTimeImmutable $observedAt,
+        public ?int $providerFeeMinorUnits = null,
+        public ?int $amountTransferredMinorUnits = null,
+        public bool $settled = false,
     ) {
         foreach ([$provider, $providerReference, $merchantReference] as $value) {
             if ($value === '' || strlen($value) > 200) {
@@ -25,6 +28,11 @@ final readonly class VerifiedPaymentStatus
         }
         if ($currency !== 'XOF') {
             throw new \InvalidArgumentException('Only XOF is supported.');
+        }
+        if (($providerFeeMinorUnits !== null && $providerFeeMinorUnits < 0)
+            || ($amountTransferredMinorUnits !== null && $amountTransferredMinorUnits < 0)
+            || ($settled && ($providerFeeMinorUnits === null || $amountTransferredMinorUnits === null))) {
+            throw new \InvalidArgumentException('Settled payment evidence must contain non-negative provider fee and transferred amount.');
         }
     }
 }

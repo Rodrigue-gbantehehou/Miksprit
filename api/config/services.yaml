@@ -8,6 +8,7 @@
 # https://symfony.com/doc/current/best_practices.html#use-parameters-for-application-configuration
 parameters:
     auth_cookie_domain: null
+    platform_commission_unconfigured: '__UNCONFIGURED__'
 
 services:
     App\Service\Auth\AuthEmailSender:
@@ -15,6 +16,10 @@ services:
             $from: '%env(MAILER_FROM)%'
 
     App\Service\Auth\AccountLinkIssuer:
+        arguments:
+            $publicBaseUrl: '%env(AUTH_PUBLIC_BASE_URL)%'
+
+    App\Service\Auth\OperatorRegistrationVerificationEmail:
         arguments:
             $publicBaseUrl: '%env(AUTH_PUBLIC_BASE_URL)%'
 
@@ -37,6 +42,11 @@ services:
             $secretKey: '%env(FEDAPAY_SECRET_KEY)%'
             $webhookSecret: '%env(FEDAPAY_WEBHOOK_SECRET)%'
             $baseUrl: '%env(FEDAPAY_BASE_URL)%'
+            $payoutsEnabled: '%env(bool:FEDAPAY_PAYOUTS_ENABLED)%'
+
+    App\Service\Payment\PlatformCommissionPolicy:
+        arguments:
+            $basisPoints: '%env(default:platform_commission_unconfigured:PLATFORM_COMMISSION_BPS)%'
 
     App\Service\Router\EnvironmentRouterCredentialResolver:
         arguments:

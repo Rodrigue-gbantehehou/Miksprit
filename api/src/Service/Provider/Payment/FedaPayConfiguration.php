@@ -12,6 +12,7 @@ final readonly class FedaPayConfiguration
         public ?string $secretKey = null,
         public ?string $webhookSecret = null,
         public ?string $baseUrl = null,
+        public bool $payoutsEnabled = false,
     ) {
     }
 
@@ -36,5 +37,10 @@ final readonly class FedaPayConfiguration
         return $this->enabled
             && $this->webhookSecret !== null
             && trim($this->webhookSecret) !== '';
+    }
+
+    public function canSendPayouts(): bool
+    {
+        return $this->payoutsEnabled && $this->canCreatePayments();
     }
 }

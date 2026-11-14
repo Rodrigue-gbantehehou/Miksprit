@@ -23,7 +23,7 @@ const benefits = [
 ];
 
 const steps = [
-  { number: "01", title: "Créez votre espace", text: "Inscrivez-vous avec votre adresse e-mail et confirmez-la pour ouvrir votre espace propriétaire." },
+  { number: "01", title: "Créez votre espace", text: "Inscrivez-vous avec votre adresse e-mail. Votre espace propriétaire est disponible dès validation du formulaire." },
   { number: "02", title: "Configurez votre réseau", text: "Ajoutez votre site, vos forfaits et votre routeur MikroTik depuis la console." },
   { number: "03", title: "Accueillez vos clients", text: "Vos clients choisissent un forfait sur le portail Wi-Fi. Le suivi des ventes reste dans votre espace." },
 ];
@@ -52,7 +52,7 @@ export default function Home() {
             <Link className="button button-primary marketing-main-cta" href="/inscription">Créer mon espace opérateur <ArrowRight size={17} aria-hidden="true" /></Link>
             <a className="marketing-secondary-cta" href="#plateforme">Découvrir Miksprit <ArrowDown size={15} aria-hidden="true" /></a>
           </div>
-          <p className="marketing-reassurance"><Check size={15} aria-hidden="true" /> Inscription avec vérification par e-mail <span /> Aucun compte Miksprit requis pour vos clients
+          <p className="marketing-reassurance"><Check size={15} aria-hidden="true" /> Espace propriétaire créé dès l’inscription <span /> Aucun compte Miksprit requis pour vos clients
           </p>
         </div>
 

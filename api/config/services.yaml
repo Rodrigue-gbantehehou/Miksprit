@@ -29,9 +29,6 @@ services:
         arguments:
             $publicBaseUrl: '%env(AUTH_PUBLIC_BASE_URL)%'
 
-    App\Service\Auth\OperatorRegistrationVerificationEmail:
-        arguments:
-            $publicBaseUrl: '%env(AUTH_PUBLIC_BASE_URL)%'
 
     App\Service\Provider\Router\SodiumVoucherCredentialCipher:
         lazy: true

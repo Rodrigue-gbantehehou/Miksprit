@@ -6,7 +6,8 @@ namespace App\Controller;
 
 use App\Service\Auth\CompleteOperatorRegistration;
 use App\Service\Auth\CsrfCookieManager;
-use App\Service\Auth\RequestOperatorRegistration;
+use App\Service\Auth\CreateOperatorAccount;
+use App\Service\Auth\OperatorRegistrationConflict;
 use Psr\Log\LoggerInterface;
 use Symfony\Component\DependencyInjection\Attribute\Autowire;
 use Symfony\Component\HttpFoundation\JsonResponse;
@@ -27,7 +28,7 @@ final readonly class OperatorRegistrationController
     public function request(
         Request $request,
         CsrfCookieManager $csrf,
-        RequestOperatorRegistration $registration,
+        CreateOperatorAccount $registration,
         LoggerInterface $logger,
     ): JsonResponse {
         try {
@@ -54,7 +55,7 @@ final readonly class OperatorRegistrationController
         }
 
         try {
-            $registration->request(
+            $account = $registration->execute(
                 $email,
                 is_string($data['organizationName'] ?? null) ? $data['organizationName'] : '',
                 is_string($data['organizationSlug'] ?? null) ? $data['organizationSlug'] : '',
@@ -62,13 +63,17 @@ final readonly class OperatorRegistrationController
             );
         } catch (\InvalidArgumentException) {
             return new JsonResponse(['error' => 'invalid_registration'], JsonResponse::HTTP_UNPROCESSABLE_ENTITY, ['Cache-Control' => 'no-store']);
+        } catch (OperatorRegistrationConflict) {
+            return new JsonResponse(['error' => 'email_or_organization_already_used'], JsonResponse::HTTP_CONFLICT, ['Cache-Control' => 'no-store']);
         } catch (\Throwable) {
-            $logger->error('Operator registration request could not be processed.');
+            $logger->error('Operator account creation failed.');
+            return new JsonResponse(['error' => 'registration_unavailable'], JsonResponse::HTTP_SERVICE_UNAVAILABLE, ['Cache-Control' => 'no-store']);
         }
 
         return new JsonResponse([
-            'message' => 'Si les informations peuvent être utilisées, un lien de vérification sera envoyé à cette adresse.',
-        ], JsonResponse::HTTP_ACCEPTED, ['Cache-Control' => 'no-store']);
+            'message' => 'Votre compte et votre espace propriétaire sont créés. Vous pouvez vous connecter.',
+            ...$account,
+        ], JsonResponse::HTTP_CREATED, ['Cache-Control' => 'no-store']);
     }
 
     #[Route('/api/v1/public/operator-registrations/verify', name: 'api_public_operator_registration_verify', methods: ['POST'])]

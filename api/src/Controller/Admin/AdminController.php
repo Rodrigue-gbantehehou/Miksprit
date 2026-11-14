@@ -113,9 +113,8 @@ final class AdminController extends AbstractController
         }
         $existingOwner = $users->findByEmail($email);
         $existingOrganization = $this->entityManager->getRepository(Organization::class)->findOneBy(['slug' => $slug]);
-        if ($existingOwner !== null || $existingOrganization instanceof Organization) {
-            if ($existingOwner instanceof User && $existingOrganization instanceof Organization
-                && $existingOrganization->name() === $organizationName) {
+        if ($existingOrganization instanceof Organization) {
+            if ($existingOwner instanceof User) {
                 $membershipStatus = $this->entityManager->getConnection()->fetchOne(
                     'SELECT status FROM tenant_memberships WHERE tenant_id = ? AND user_id = ?',
                     [$existingOrganization->tenantId()->value, $existingOwner->id()],
@@ -140,11 +139,14 @@ final class AdminController extends AbstractController
                 }
             }
 
-            return $this->json(['error' => 'Un compte ou cet identifiant d’organisation existe déjà. Vérifiez la liste des comptes et renvoyez l’invitation si elle est en attente.'], 409, ['Cache-Control' => 'no-store']);
+            return $this->json(['error' => 'Cet identifiant URL est déjà attribué à une autre organisation ou ce propriétaire est déjà lié à cet espace.'], 409, ['Cache-Control' => 'no-store']);
         }
 
-        $owner = User::create(bin2hex(random_bytes(16)), $email, 'pending');
-        $owner->setPassword($passwordHasher->hashPassword($owner, bin2hex(random_bytes(32))));
+        $owner = $existingOwner;
+        if (!$owner instanceof User) {
+            $owner = User::create(bin2hex(random_bytes(16)), $email, 'pending');
+            $owner->setPassword($passwordHasher->hashPassword($owner, bin2hex(random_bytes(32))));
+        }
         $tenantId = new TenantId(bin2hex(random_bytes(16)));
         $organization = Organization::create($tenantId, $organizationName, $slug);
         $membership = Membership::invite(bin2hex(random_bytes(16)), $tenantId, $owner->id(), \App\Entity\TenantRole::Owner);

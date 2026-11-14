@@ -52,7 +52,7 @@ async function write<T>(path: string, method: "POST" | "PATCH", payload: Record<
   if (response.status === 401) { redirectToCentralLogin(); throw new Error("Session expirée."); }
   const result = await response.json().catch(() => ({})) as T & { error?: string };
   if (response.status === 409 && path === "/admin/users") {
-    throw new Error("Un compte ou cet identifiant d’organisation existe déjà. Vérifie la liste des comptes et renvoie l’invitation si elle est en attente.");
+    throw new Error("Cet identifiant URL est déjà attribué à une autre organisation ou ce propriétaire est déjà lié à cet espace.");
   }
   if (!response.ok) throw new Error(result.error ?? `L’API a répondu avec le statut ${response.status}.`);
   return result;

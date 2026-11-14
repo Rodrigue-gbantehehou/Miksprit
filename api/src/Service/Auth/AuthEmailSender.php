@@ -10,11 +10,11 @@ use Symfony\Component\Mime\Email;
 
 final readonly class AuthEmailSender
 {
-    public function __construct(private MailerInterface $mailer, private string $from) {}
+    public function __construct(private MailerInterface $mailer, private string $fromAddress, private string $fromName) {}
 
     public function send(string $recipient, string $subject, string $text): void
     {
-        $email = (new Email())->from(Address::create($this->from))->to($recipient)->subject($subject)->text($text);
+        $email = (new Email())->from(new Address($this->fromAddress, $this->fromName))->to($recipient)->subject($subject)->text($text);
         $this->mailer->send($email);
     }
 }

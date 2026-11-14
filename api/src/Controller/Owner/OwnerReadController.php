@@ -6,6 +6,7 @@ namespace App\Controller\Owner;
 
 use App\Entity\User;
 use App\Service\Owner\OwnerReadService;
+use App\Service\Owner\OwnerTenantContextUnavailable;
 use App\Service\Owner\OwnerWriteService;
 use App\Service\Auth\CsrfCookieManager;
 use App\Service\Owner\OwnerTenantSelectionRequired;
@@ -155,6 +156,8 @@ final class OwnerReadController extends AbstractController
             return $this->json($operation($context, $data), $successStatus, ['Cache-Control' => 'no-store, private']);
         } catch (OwnerTenantSelectionRequired) {
             return $this->json(['error' => 'Organization selection is required.', 'code' => 'tenant_selection_required'], 409, ['Cache-Control' => 'no-store, private']);
+        } catch (OwnerTenantContextUnavailable) {
+            return $this->json(['error' => 'Votre compte n’est associé à aucune organisation active. Un administrateur de la plateforme doit vous inviter comme propriétaire.', 'code' => 'owner_tenant_unavailable'], 403, ['Cache-Control' => 'no-store, private']);
         } catch (\InvalidArgumentException $exception) {
             return $this->json(['error' => $exception->getMessage()], 422, ['Cache-Control' => 'no-store, private']);
         } catch (\DomainException $exception) {
@@ -191,6 +194,8 @@ final class OwnerReadController extends AbstractController
             return $this->json($operation($context), 200, ['Cache-Control' => 'no-store, private']);
         } catch (OwnerTenantSelectionRequired) {
             return $this->json(['error' => 'Organization selection is required.', 'code' => 'tenant_selection_required'], 409, ['Cache-Control' => 'no-store, private']);
+        } catch (OwnerTenantContextUnavailable) {
+            return $this->json(['error' => 'Votre compte n’est associé à aucune organisation active. Un administrateur de la plateforme doit vous inviter comme propriétaire.', 'code' => 'owner_tenant_unavailable'], 403, ['Cache-Control' => 'no-store, private']);
         } catch (\DomainException $exception) {
             $status = str_contains($exception->getMessage(), 'Access denied') ? 403 : 404;
             return $this->json(['error' => $status === 403 ? 'Access denied.' : 'Tenant context not found.'], $status, ['Cache-Control' => 'no-store, private']);

@@ -56,6 +56,9 @@ async function get<T>(path: string, signal?: AbortSignal): Promise<T> {
 }
 
 async function write<T>(path: string, method: "POST" | "PATCH", payload: Record<string, unknown>): Promise<T> {
+  if (path.startsWith("/owner/") && !selectedTenantId) {
+    throw new Error("Ce compte n’est lié à aucune organisation active. Un administrateur de la plateforme doit d’abord vous inviter comme propriétaire.");
+  }
   const csrfResponse = await fetch(`${API_BASE}/auth/csrf`, { credentials: "same-origin", cache: "no-store", headers: { Accept: "application/json" } });
   if (!csrfResponse.ok) throw new Error("Impossible de vérifier votre accès.");
   const csrf = await csrfResponse.json() as { csrfToken?: string };

@@ -37,7 +37,7 @@ final readonly class ResolveOwnerContext
             if (count($memberships) > 1) {
                 throw new OwnerTenantSelectionRequired('Select an organization using the X-Tenant-ID header.');
             }
-            throw new \DomainException('Owner tenant context not found.');
+            throw new OwnerTenantContextUnavailable('The authenticated account has no active organization membership.');
         }
 
         return TenantContext::fromMembership($memberships[0], $actorId);

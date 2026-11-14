@@ -1,0 +1,24 @@
+# see https://symfony.com/doc/current/reference/configuration/framework.html
+framework:
+    secret: '%env(APP_SECRET)%'
+
+    rate_limiter:
+        auth_login:
+            policy: sliding_window
+            limit: 10
+            interval: '15 minutes'
+        password_link_request:
+            policy: sliding_window
+            limit: 5
+            interval: '15 minutes'
+        public_checkout:
+            policy: sliding_window
+            limit: 12
+            interval: '5 minutes'
+
+    #esi: true
+    #fragments: true
+
+when@test:
+    framework:
+        test: true

@@ -1,0 +1,32 @@
+# Dependencies and generated builds
+**/node_modules/
+**/vendor/
+**/.next/
+**/dist/
+**/build/
+**/coverage/
+**/var/
+**/next-env.d.ts
+**/tsconfig.tsbuildinfo
+
+# Local configuration and secrets
+**/.env
+**/.env.*
+!**/.env.example
+api/.env.dev
+api/config/jwt/*.pem
+*.key
+*.log
+
+# Local databases and backups
+*.sqlite
+*.sqlite3
+*.sql
+*.dump
+*.bak
+
+# OS/editor files
+.DS_Store
+Thumbs.db
+.idea/
+.vscode/

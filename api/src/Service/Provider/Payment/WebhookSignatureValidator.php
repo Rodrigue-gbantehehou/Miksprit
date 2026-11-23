@@ -16,9 +16,11 @@ final readonly class WebhookSignatureValidator
     }
 
     /** Validates FedaPay's t=<unix>,s=<hex> signature over "<timestamp>.<raw-body>". */
-    public function isValid(string $rawBody, ?string $providedSignature): bool
+    public function isValid(string $rawBody, ?string $providedSignature, ?string $webhookSecret = null): bool
     {
-        if (!$this->configuration->canValidateWebhooks() || $providedSignature === null) {
+        $secret = $webhookSecret ?? $this->configuration->webhookSecret;
+        if (($webhookSecret === null && !$this->configuration->canValidateWebhooks())
+            || !is_string($secret) || trim($secret) === '' || $providedSignature === null) {
             return false;
         }
 
@@ -47,7 +49,7 @@ final readonly class WebhookSignatureValidator
             return false;
         }
 
-        $expected = hash_hmac('sha256', $timestamp.'.'.$rawBody, $this->configuration->webhookSecret);
+        $expected = hash_hmac('sha256', $timestamp.'.'.$rawBody, $secret);
         $valid = false;
         foreach ($signatures as $signature) {
             if (preg_match('/^[a-fA-F0-9]{64}$/D', $signature) === 1) {

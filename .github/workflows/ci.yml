@@ -1,0 +1,58 @@
+name: CI
+
+on:
+  push:
+    branches: [master]
+  pull_request:
+
+permissions:
+  contents: read
+
+jobs:
+  api:
+    runs-on: ubuntu-latest
+    defaults:
+      run:
+        working-directory: api
+    env:
+      APP_ENV: test
+      APP_SECRET: ci-only-secret
+      DATABASE_URL: sqlite:///%kernel.project_dir%/var/ci-test.db
+      TENANT_PAYMENT_ENCRYPTION_KEY: ci-only-encryption-key-32-bytes!!
+    steps:
+      - uses: actions/checkout@v4
+      - uses: shivammathur/setup-php@v2
+        with:
+          php-version: '8.4'
+          extensions: ctype, curl, iconv, pdo_sqlite, sodium
+          coverage: none
+      - run: composer install --no-interaction --prefer-dist
+      - run: php bin/console lint:container
+      - name: Run integration proofs
+        shell: bash
+        run: |
+          set -euo pipefail
+          for proof in tests/Integration/verify-*.php; do
+            php "$proof"
+          done
+
+  web:
+    runs-on: ubuntu-latest
+    strategy:
+      fail-fast: false
+      matrix:
+        app: [client, admin, landing]
+    defaults:
+      run:
+        working-directory: ${{ matrix.app }}
+    steps:
+      - uses: actions/checkout@v4
+      - uses: actions/setup-node@v4
+        with:
+          node-version: 22
+          cache: npm
+          cache-dependency-path: ${{ matrix.app }}/package-lock.json
+      - run: npm ci
+      - run: npm exec -- tsc --noEmit
+      - run: npm run lint
+      - run: npm run build

@@ -11,11 +11,16 @@ use App\Service\Router\RouterProvisioningTarget;
 use App\Service\Router\RouterProvisioningTargetRepository;
 use Doctrine\ORM\EntityManagerInterface;
 use Symfony\Component\DependencyInjection\Attribute\AsAlias;
+use Symfony\Component\DependencyInjection\Attribute\Autowire;
 
 #[AsAlias(RouterProvisioningTargetRepository::class)]
 final readonly class DoctrineRouterProvisioningTargetRepository implements RouterProvisioningTargetRepository
 {
-    public function __construct(private EntityManagerInterface $entityManager)
+    public function __construct(
+        private EntityManagerInterface $entityManager,
+        #[Autowire('%env(default:empty_secret:ROUTER_ALLOWED_HOSTS)%')]
+        private string $allowedHosts,
+    )
     {
     }
 
@@ -37,8 +42,14 @@ final readonly class DoctrineRouterProvisioningTargetRepository implements Route
             return null;
         }
 
+        $host = strtolower(rtrim((string) $row['host'], '.'));
+        $allowlist = array_filter(array_map(static fn (string $value): string => strtolower(rtrim(trim($value), '.')), explode(',', $this->allowedHosts)));
+        if ($allowlist === [] || !in_array($host, $allowlist, true)) {
+            throw new \DomainException('Router endpoint is not in the deployment allowlist.');
+        }
+
         return new RouterProvisioningTarget(
-            new RouterOsConnection((string) $row['host'], (int) $row['port']),
+            new RouterOsConnection($host, (int) $row['port']),
             (string) $row['credentialReference'],
             (string) $row['providerCode'],
         );

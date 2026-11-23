@@ -93,13 +93,13 @@ final readonly class AdminReadModel
         ];
     }
 
-    /** @return list<array{id: string, email: string, active: bool, roles: list<string>, invitationPending: bool}> */
+    /** @return list<array{id: string, email: string, active: bool, roles: list<string>}> */
     public function users(): array
     {
-        $users = $this->entityManager->getConnection()->fetchAllAssociative("SELECT u.id, u.email, u.active, u.roles, EXISTS (SELECT 1 FROM tenant_memberships m WHERE m.user_id = u.id AND m.status = 'invited') AS invitation_pending FROM users u ORDER BY u.created_at DESC LIMIT 500");
+        $users = $this->entityManager->getConnection()->fetchAllAssociative('SELECT u.id, u.email, u.active, u.roles FROM users u ORDER BY u.created_at DESC LIMIT 500');
         return array_map(static function (array $row): array {
             $roles = json_decode((string) $row['roles'], true);
-            return ['id' => (string) $row['id'], 'email' => (string) $row['email'], 'active' => (bool) $row['active'], 'roles' => is_array($roles) ? array_values(array_filter($roles, 'is_string')) : [], 'invitationPending' => (bool) $row['invitation_pending']];
+            return ['id' => (string) $row['id'], 'email' => (string) $row['email'], 'active' => (bool) $row['active'], 'roles' => is_array($roles) ? array_values(array_filter($roles, 'is_string')) : []];
         }, $users);
     }
 }

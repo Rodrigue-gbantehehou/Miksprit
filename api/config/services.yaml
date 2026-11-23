@@ -9,6 +9,8 @@
 parameters:
     auth_cookie_domain: null
     platform_commission_unconfigured: '__UNCONFIGURED__'
+    empty_secret: ''
+    platform_subscriptions_not_required: false
 
 services:
     # default configuration for services in *this* file
@@ -45,10 +47,6 @@ services:
     App\Service\Payment\PlatformCommissionPolicy:
         arguments:
             $basisPoints: '%env(default:platform_commission_unconfigured:PLATFORM_COMMISSION_BPS)%'
-
-    App\Service\Router\EnvironmentRouterCredentialResolver:
-        arguments:
-            $credentials: '%env(json:ROUTER_CREDENTIALS_JSON)%'
 
     # add more service definitions when explicit configuration is needed
     # please note that last definitions always *replace* previous ones

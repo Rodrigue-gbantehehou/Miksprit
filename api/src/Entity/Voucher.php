@@ -37,6 +37,9 @@ final class Voucher implements TenantOwned
     #[ORM\Column(name: 'encrypted_credential', type: 'text', nullable: true)]
     private ?string $encryptedCredential = null;
 
+    #[ORM\Column(name: 'router_username', type: 'string', length: 128, nullable: true)]
+    private ?string $routerUsername = null;
+
     #[ORM\Column(name: 'status', enumType: VoucherStatus::class, length: 16)]
     private VoucherStatus $voucherStatus = VoucherStatus::Reserved;
 
@@ -90,13 +93,20 @@ final class Voucher implements TenantOwned
         return $this->routerId;
     }
 
-    /** Activate only after a router confirms that it accepted the encrypted credential. */
-    public function markProvisioned(string $encryptedCredential, \DateTimeImmutable $expiresAt): void
+    public function routerUsername(): ?string
     {
-        if ($this->voucherStatus !== VoucherStatus::Reserved || trim($encryptedCredential) === '' || $expiresAt <= new \DateTimeImmutable()) {
+        return $this->routerUsername;
+    }
+
+    /** Activate only after a router confirms that it accepted the encrypted credential. */
+    public function markProvisioned(string $encryptedCredential, \DateTimeImmutable $expiresAt, string $routerUsername): void
+    {
+        if ($this->voucherStatus !== VoucherStatus::Reserved || trim($encryptedCredential) === '' || $expiresAt <= new \DateTimeImmutable()
+            || trim($routerUsername) === '' || strlen($routerUsername) > 128 || preg_match('/[\x00-\x1F\x7F]/', $routerUsername) === 1) {
             throw new \DomainException('Voucher requires a reserved state, encrypted credential, and future expiry.');
         }
         $this->encryptedCredential = $encryptedCredential;
+        $this->routerUsername = $routerUsername;
         $this->expiresAt = $expiresAt;
         $this->voucherStatus = VoucherStatus::Active;
     }

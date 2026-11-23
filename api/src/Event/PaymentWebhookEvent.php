@@ -12,11 +12,13 @@ final readonly class PaymentWebhookEvent
         public string $eventType,
         public string $providerReference,
         public string $provider = 'fedapay',
+        public ?string $tenantId = null,
     ) {
         foreach ([$eventId, $eventType, $providerReference, $provider] as $value) {
             if (trim($value) === '' || strlen($value) > 200 || preg_match('/[\x00-\x1F\x7F]/', $value) === 1) {
                 throw new \InvalidArgumentException('Webhook event identifiers must be present and bounded.');
             }
         }
+        if ($tenantId !== null && (trim($tenantId) === '' || strlen($tenantId) > 80)) throw new \InvalidArgumentException('Webhook tenant identifier is invalid.');
     }
 }

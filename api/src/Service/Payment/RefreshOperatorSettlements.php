@@ -17,7 +17,7 @@ final readonly class RefreshOperatorSettlements
         $settled = 0; $pending = 0; $failed = 0;
         foreach ($rows as $row) {
             try {
-                $status = $this->providers->verify((string) $row['provider'], (string) $row['provider_reference']);
+                $status = $this->providers->verifyLegacy((string) $row['provider'], (string) $row['provider_reference']);
                 if ($status->merchantReference !== $row['order_reference'] || $status->amount->minorUnits !== (int) $row['gross_minor_units'] || !$status->settled
                     || $status->providerFeeMinorUnits === null || $status->amountTransferredMinorUnits === null) { ++$pending; continue; }
                 $commission = intdiv((int) $row['gross_minor_units'] * (int) $row['commission_bps'], 10_000);

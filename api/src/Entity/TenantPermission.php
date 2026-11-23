@@ -8,7 +8,9 @@ enum TenantPermission: string
 {
     case ManageOrganization = 'organization.manage';
     case ManagePayouts = 'payouts.manage';
+    case ManagePaymentSettings = 'payments.manage';
     case ManageMembers = 'members.manage';
+    case ManageSubscription = 'subscription.manage';
     case ManageSites = 'sites.manage';
     case ManageRouters = 'routers.manage';
     case ManagePlans = 'plans.manage';

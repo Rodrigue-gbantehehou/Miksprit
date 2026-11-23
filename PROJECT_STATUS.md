@@ -1,41 +1,33 @@
 # Miksprit — état du projet
 
-Dernière mise à jour : 2026-11-14
+Mis à jour le 22 novembre 2026. Ce document décrit le dépôt et l'environnement local contrôlé; il ne certifie pas un déploiement ni une recette réelle.
 
-## État du jalon paiement et accès Wi-Fi
+## Fonctionnalités présentes
 
-Le parcours applicatif est câblé de bout en bout : catalogue public, création idempotente d'une commande et d'une tentative, checkout hébergé FedaPay configurable, retour navigateur sans confiance, webhook signé suivi d'une vérification serveur FedaPay, confirmation atomique, outbox, provisioning RouterOS, remise conditionnelle des identifiants et expiration du voucher. Les interfaces paiement et routeur sont extensibles par adaptateurs enregistrés; MikroTik est le premier driver.
+- Espace opérateur : organisations, sites, forfaits, routeurs MikroTik, sessions, transactions, configuration FedaPay propre au fournisseur, membres et abonnements Miksprit.
+- Paiements de tickets directement sur le compte marchand de l'opérateur; aucun reversement Miksprit sur les nouvelles ventes. FedaPay est le seul fournisseur de paiement intégré.
+- JWT d'accès de 15 minutes et jeton de renouvellement opaque rotatif (14 jours d'inactivité, 30 jours maximum), révocable à la déconnexion, à la réinitialisation du mot de passe et à la désactivation du compte.
+- Migrations de paiement tenant, abonnement, routeurs et renouvellement de session présentes. La base locale `db_miksprit` a été contrôlée à `Version20261121170000`; l'état de toute autre base, notamment production, doit être vérifié indépendamment.
+- Workflow CI dans `.github/workflows/ci.yml` pour l'API et les trois applications. Son exécution distante sur GitHub reste à confirmer.
 
-La console propriétaire permet de sélectionner le driver Wi-Fi lors de l'enrôlement et de vérifier un routeur avant son activation. L'API accepte uniquement les drivers enregistrés. Le statut public du paiement n'expose les identifiants qu'après confirmation du provisioning.
+## État de préparation production
 
-## Configuration avant essai réel
+**Pas encore prêt à déployer.** Le compose fourni démarre MySQL uniquement. L'API et les interfaces nécessitent un hébergement, HTTPS, un reverse proxy et leurs URL de production. Les exemples d'environnement contiennent des valeurs locales ou factices; configurer les clés, le fournisseur e-mail, la base et les URL de retour dans un gestionnaire de secrets.
 
-- Dans `api/.env.local` ou le gestionnaire de secrets, renseigner les clés FedaPay et le secret du webhook du même environnement, `FEDAPAY_ENABLED=1`, ainsi qu'une vraie URL HTTPS dans `PAYMENT_RETURN_URL`.
-- Générer `VOUCHER_CREDENTIAL_ENCRYPTION_KEY` au format documenté; configurer `ROUTEROS_HOTSPOT_PROFILE` et fournir `ROUTER_CREDENTIALS_JSON` par un gestionnaire de secrets.
-- Configurer la tâche planifiée `php bin/console miksprit:payments:process-paid-orders --limit=25` et `php bin/console miksprit:vouchers:expire --limit=100` chaque minute. Prévoir supervision et rapprochement manuel des messages ambigus.
-- Examiner les migrations en attente puis appliquer `doctrine:migrations:migrate` explicitement dans l'environnement choisi. Aucune migration n'a été exécutée pendant ce travail.
-- Vérifier le webhook FedaPay, le réseau TLS sortant, le profil hotspot et le parcours complet dans l'environnement sandbox avant toute activation en production.
+À préparer avant lancement :
 
-## Architecture et garde-fous
+1. Héberger Symfony, client, admin et landing sous un domaine compatible avec les cookies; renseigner toutes les variables d'environnement avant les builds Next.js.
+2. Sauvegarder la base cible, vérifier `doctrine:migrations:status`, puis appliquer seulement les migrations absentes.
+3. Planifier et superviser chaque minute les tâches `miksprit:payments:process-paid-orders`, `miksprit:vouchers:expire`, `miksprit:subscriptions:refresh` et `miksprit:routers:sync-sessions`, puis purger les sessions de renouvellement expirées chaque jour avec `miksprit:auth:prune-refresh-sessions`.
+4. Configurer FedaPay marchand et plateforme séparément, les webhooks HTTPS, le mailer et les secrets de chiffrement/JWT.
+5. Définir les hôtes routeur autorisés, les règles egress et TLS; recetter sur un vrai MikroTik.
+6. Mettre en place sauvegardes chiffrées hors site, alertes et exercice de restauration.
+7. Décider le prix et les règles de l'abonnement avant d'activer `PLATFORM_SUBSCRIPTIONS_REQUIRED=1`.
 
-- Un fichier par entité sous `api/src/Entity`, services regroupés par domaine sous `api/src/Service`, événements sous `api/src/Event` et repositories plats sous `api/src/Repository`.
-- `PaymentProviderRegistry` et `RouterDriverRegistry` sélectionnent des adaptateurs taggés; une valeur absente ou inconnue échoue sans bascule silencieuse.
-- La notification signée n'est pas considérée comme preuve suffisante : l'état est relu côté serveur auprès du PSP et comparé à la commande, au montant et à la devise.
-- Le ledger est append-only. Le provisioning est idempotent et fermé en cas de réponse réseau ambiguë; aucune répétition automatique ne risque de créer un second compte. Ces cas exigent une réconciliation opérateur.
-- Les secrets ne sont pas renvoyés par l'API; les identifiants voucher sont chiffrés et ne sont exposés qu'au détenteur de la référence aléatoire de commande après provisioning.
+Les essais FedaPay réels, la livraison de courriels et un équipement MikroTik physique ne sont pas attestés ici. Les changements présents dans le dépôt doivent encore passer par la revue et le workflow CI avant livraison.
 
-## Vérifications réalisées
+## Références
 
-- Validation de configuration Symfony (`lint:container`) et mapping Doctrine (`doctrine:schema:validate --skip-sync`).
-- Routes checkout, état public, webhook et vérification/choix du driver propriétaire enregistrées; commandes de provisioning et d'expiration découvertes.
-- `composer validate` est valide, avec un avertissement préexistant sur la contrainte exacte Lexik JWT.
-- ESLint est passé. La vérification TypeScript a détecté un champ manquant dans le type partagé `Router`; correction appliquée, contrôle à relancer.
-- Aucun test automatisé, appel FedaPay/RouterOS, migration ou synchronisation de base n'a été exécuté.
-
-## Reste pour l'exploitation complète du produit
-
-1. Fournir les paramètres locaux/secrets, créer le super-admin, vérifier le mail et les flux JWT depuis un navigateur.
-2. Appliquer et contrôler les migrations dans une base choisie.
-3. Exécuter la recette sandbox réelle du parcours paiement → voucher → accès, puis valider l'expiration sur un routeur de test.
-4. Déployer worker/cron durables, alertes, CI, sauvegardes chiffrées planifiées et exercice de restauration.
-5. Compléter la gestion des membres propriétaire, le renouvellement JWT et les drivers des futurs kits Wi-Fi/PSP selon leurs contrats.
+- [État d'implémentation du cahier des charges](docs/architecture/cahier-des-charges-implementation.md)
+- [Déploiement, sauvegardes et supervision](docs/deployment/operations.md)
+- [Configuration locale MySQL](deploy/README.md)

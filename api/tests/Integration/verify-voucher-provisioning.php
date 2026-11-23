@@ -100,7 +100,7 @@ if ($repository->findRouterForTenant($otherContext, 'router_000001') !== null
 }
 
 $credentialEnvelope = $cipher->encrypt($tenant, 'voucher_000001', 'voucher-user', 'private-password');
-$voucher->markProvisioned($credentialEnvelope, $now->modify('+1 hour'));
+$voucher->markProvisioned($credentialEnvelope, $now->modify('+1 hour'), 'w123456789012345');
 $order->fulfill($voucher->id);
 $repository->completeProvisioning($voucher, $order);
 $entityManager->clear();

@@ -33,7 +33,7 @@ final readonly class RouterOsHotspotProvisionerFactory implements HotspotProvisi
         if ($target->providerCode() !== $router->providerCode()) {
             throw new \DomainException('Router provider configuration changed; reload and retry.');
         }
-        $credentials = $this->credentials->resolve($target->credentialReference());
+        $credentials = $this->credentials->resolve($router->tenantId(), $target->credentialReference());
 
         return $driver->connect($target, $credentials);
     }

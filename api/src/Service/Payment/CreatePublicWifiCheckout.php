@@ -9,7 +9,6 @@ use App\Entity\PlanSnapshot;
 use App\Entity\WifiOrder;
 use App\Repository\PublicCheckoutRepository;
 use App\Service\Provider\Payment\CheckoutTokenUnavailable;
-use Symfony\Component\DependencyInjection\Attribute\Autowire;
 
 /** Creates a frozen public Wi-Fi order and starts its configured payment provider. */
 final readonly class CreatePublicWifiCheckout
@@ -18,15 +17,12 @@ final readonly class CreatePublicWifiCheckout
         private PublicCheckoutRepository $repository,
         private PaymentProviderRegistry $providers,
         private PaymentCheckoutSettings $settings,
-        private PlatformCommissionPolicy $commissionPolicy,
-        #[Autowire('%env(PAYMENT_DEFAULT_PROVIDER)%')] private string $defaultProvider,
+        private TenantPaymentSettings $tenantPaymentSettings,
     ) {
     }
 
     public function execute(string $siteId, string $planId, PaymentCustomer $customer, string $idempotencyKey): PublicWifiCheckout
     {
-        // Never accept a sale whose operator balance cannot later be calculated under an agreed policy.
-        $commissionBasisPoints = $this->commissionPolicy->basisPoints();
         if (preg_match('/^[A-Za-z0-9_-]{16,128}$/D', $idempotencyKey) !== 1) throw new \InvalidArgumentException('Checkout idempotency key is invalid.');
         $keyHash = hash('sha256', $siteId."\0".$planId."\0".strtolower($customer->email)."\0".$idempotencyKey);
         $existing = $this->repository->findAttemptByCheckoutKeyHash($keyHash);
@@ -36,25 +32,26 @@ final readonly class CreatePublicWifiCheckout
                     return new PublicWifiCheckout($existing->orderReference, $existing->provider,
                         new PaymentSession($existing->providerReference(), $existing->checkoutUrl()));
                 }
-                $session = $this->providers->resumeCheckout($existing->provider, $existing->providerReference(), 'payment-attempt:'.$existing->id);
+                $session = $this->providers->resumeCheckoutForTenant($existing->provider, $existing->tenantId->value, $existing->providerReference(), 'payment-attempt:'.$existing->id);
                 $existing->attachCheckoutUrl($session->checkoutUrl);
                 $this->repository->saveAttempt($existing);
                 return new PublicWifiCheckout($existing->orderReference, $existing->provider, $session);
             }
             throw new PublicCheckoutInProgress($existing->orderReference);
         }
-        if (!$this->providers->canCheckout($this->defaultProvider)) throw new PublicPaymentUnavailable();
         $snapshot = $this->repository->findPurchaseablePlan($siteId, $planId);
         if (!$snapshot instanceof PlanSnapshot) throw new \DomainException('Published plan not found for this site.');
+        $merchant = $this->tenantPaymentSettings->forTenant($snapshot->tenantId->value);
+        if ($merchant === null || !$this->providers->canCheckoutForTenant($merchant['provider'], $snapshot->tenantId->value)) throw new PublicPaymentUnavailable();
 
         $orderReference = bin2hex(random_bytes(32));
-        $order = new WifiOrder(bin2hex(random_bytes(16)), $orderReference, $snapshot->tenantId, $snapshot, new \DateTimeImmutable(), $commissionBasisPoints);
+        $order = new WifiOrder(bin2hex(random_bytes(16)), $orderReference, $snapshot->tenantId, $snapshot, new \DateTimeImmutable());
         $attempt = new PaymentAttempt(bin2hex(random_bytes(16)), $snapshot->tenantId, $orderReference,
-            $this->defaultProvider, $snapshot->price, checkoutRequestKeyHash: $keyHash);
+            $merchant['provider'], $snapshot->price, checkoutRequestKeyHash: $keyHash);
         $this->repository->saveOrderAndAttempt($order, $attempt);
 
         try {
-            $session = $this->providers->checkout($attempt->provider, new PaymentIntent(
+            $session = $this->providers->checkoutForTenant($attempt->provider, $snapshot->tenantId->value, new PaymentIntent(
                 merchantReference: $orderReference,
                 amountMinor: $snapshot->price->minorUnits,
                 currency: 'XOF',

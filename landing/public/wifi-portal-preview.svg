@@ -1,0 +1,45 @@
+<svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 640 520" fill="none">
+  <rect width="640" height="520" rx="18" fill="#EEF3ED"/>
+  <path d="M0 391c111-60 195-61 310-5 114 56 222 49 330-11v145H0V391Z" fill="#E0EAE0"/>
+  <circle cx="505" cy="113" r="78" fill="#DCE9DD"/>
+  <circle cx="505" cy="113" r="51" stroke="#176D55" stroke-opacity=".2" stroke-width="2"/>
+  <circle cx="505" cy="113" r="29" stroke="#176D55" stroke-opacity=".3" stroke-width="2"/>
+  <circle cx="505" cy="113" r="7" fill="#176D55"/>
+  <path d="M476 143a41 41 0 0 1 58 0M459 160a65 65 0 0 1 92 0" stroke="#176D55" stroke-width="5" stroke-linecap="round"/>
+  <rect x="91" y="39" width="318" height="435" rx="27" fill="#182D25"/>
+  <rect x="101" y="50" width="298" height="413" rx="19" fill="#FBFCFA"/>
+  <rect x="209" y="58" width="83" height="7" rx="3.5" fill="#D8E0D9"/>
+  <rect x="121" y="82" width="258" height="120" rx="11" fill="#176D55"/>
+  <circle cx="151" cy="112" r="15" fill="#D8EBDC"/>
+  <path d="M142 112a13 13 0 0 1 18 0M146 116a7 7 0 0 1 10 0" stroke="#176D55" stroke-width="2" stroke-linecap="round"/>
+  <circle cx="151" cy="120" r="1.5" fill="#176D55"/>
+  <text x="176" y="111" fill="#CDE5D5" font-family="Arial,sans-serif" font-size="10" font-weight="700" letter-spacing="1">PORTAIL WI-FI</text>
+  <text x="136" y="151" fill="white" font-family="Arial,sans-serif" font-size="20" font-weight="700">Votre zone Wi-Fi</text>
+  <text x="136" y="174" fill="#E0EEE4" font-family="Arial,sans-serif" font-size="11">Choisissez un accès et connectez-vous.</text>
+  <text x="122" y="228" fill="#243A30" font-family="Arial,sans-serif" font-size="13" font-weight="700">Tickets disponibles</text>
+  <rect x="121" y="242" width="258" height="65" rx="8" fill="white" stroke="#DFE7E0"/>
+  <rect x="136" y="258" width="30" height="30" rx="6" fill="#EDF4EE"/>
+  <path d="M145 273h12m-6-6v12" stroke="#176D55" stroke-width="1.7" stroke-linecap="round"/>
+  <rect x="178" y="257" width="104" height="8" rx="4" fill="#344A3D" fill-opacity=".84"/>
+  <rect x="178" y="273" width="75" height="6" rx="3" fill="#91A197" fill-opacity=".65"/>
+  <path d="m354 268 5 5-5 5" stroke="#829188" stroke-width="1.6" stroke-linecap="round" stroke-linejoin="round"/>
+  <rect x="121" y="316" width="258" height="65" rx="8" fill="white" stroke="#DFE7E0"/>
+  <rect x="136" y="333" width="30" height="30" rx="6" fill="#F5F1E7"/>
+  <circle cx="151" cy="348" r="8" stroke="#A27B38" stroke-width="1.6"/>
+  <path d="M151 343v5l3 2" stroke="#A27B38" stroke-width="1.6" stroke-linecap="round"/>
+  <rect x="178" y="331" width="112" height="8" rx="4" fill="#344A3D" fill-opacity=".84"/>
+  <rect x="178" y="347" width="83" height="6" rx="3" fill="#91A197" fill-opacity=".65"/>
+  <path d="m354 342 5 5-5 5" stroke="#829188" stroke-width="1.6" stroke-linecap="round" stroke-linejoin="round"/>
+  <rect x="121" y="394" width="258" height="43" rx="7" fill="#176D55"/>
+  <text x="250" y="420" text-anchor="middle" fill="white" font-family="Arial,sans-serif" font-size="12" font-weight="700">Continuer vers le paiement</text>
+  <rect x="431" y="266" width="166" height="101" rx="12" fill="white" stroke="#D8E2D9"/>
+  <rect x="449" y="285" width="130" height="48" rx="7" fill="#F0F4F0"/>
+  <path d="M463 301h102M463 310h102M463 319h102" stroke="#D5DED6" stroke-width="2"/>
+  <circle cx="580" cy="349" r="12" fill="#176D55"/>
+  <path d="m575 349 3 3 6-7" stroke="white" stroke-width="1.8" stroke-linecap="round" stroke-linejoin="round"/>
+  <path d="M410 113h48M410 113l32 25" stroke="#176D55" stroke-opacity=".28" stroke-width="2" stroke-dasharray="4 6"/>
+  <rect x="37" y="350" width="127" height="53" rx="9" fill="white" stroke="#D8E2D9"/>
+  <circle cx="57" cy="376" r="7" fill="#63A57D"/>
+  <text x="74" y="373" fill="#344A3D" font-family="Arial,sans-serif" font-size="10" font-weight="700">Accès activé</text>
+  <text x="74" y="388" fill="#819087" font-family="Arial,sans-serif" font-size="9">par le routeur</text>
+</svg>

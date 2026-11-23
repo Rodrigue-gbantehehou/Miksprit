@@ -32,7 +32,8 @@ final readonly class IdempotentPaymentWebhookService
             throw new InvalidPaymentWebhook('Webhook provider is invalid or not configured.', previous: $exception);
         }
 
-        $key = hash('sha256', $provider.':'.$event->eventId);
+        // Provider event IDs may only be unique within one merchant account.
+        $key = hash('sha256', $provider.':'.($event->tenantId ?? $event->providerReference).':'.$event->providerReference.':'.$event->eventId);
         if (!$this->idempotencyStore->claim($key)) {
             return false;
         }

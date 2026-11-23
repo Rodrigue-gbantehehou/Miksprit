@@ -11,3 +11,5 @@ This block is written and re-added by `next dev` — verify at `node_modules/nex
 ## Règle UI Miksprit
 
 Respecte `../docs/architecture/design-system.md` pour chaque interface. Réutilise les composants shadcn/ui versionnés dans `components/ui/`; ne crée pas de boutons, badges ou cartes spécifiques à une seule page sans étendre d’abord les variantes communes. Garde la palette, la typographie et les états API cohérents. N’ajoute jamais de données de démonstration, de faux graphiques, de dégradés décoratifs ou d’icônes emoji.
+
+Avant livraison d’un changement visuel, applique la « Revue obligatoire des changements d’interface » du design system. Elle s’impose aussi à tout agent qui intervient dans ce dossier. Vérifie le rendu mobile et bureau, ou signale explicitement si cette vérification n’a pas été possible.

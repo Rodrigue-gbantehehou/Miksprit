@@ -110,7 +110,7 @@ final readonly class ProvisionVoucher
         // Encrypt before persistence; plaintext remains only in this call's memory.
         try {
             $encryptedCredential = $this->cipher->encrypt($context->tenantId, $voucher->id, $request->username, $request->passwordForProvisioning());
-            $voucher->markProvisioned($encryptedCredential, $request->expiresAt);
+            $voucher->markProvisioned($encryptedCredential, $request->expiresAt, $request->username);
             $order->fulfill($voucher->id);
             $this->repository->completeProvisioning($voucher, $order);
             // If persistence/complete fails after RouterOS success, retain the claim for reconciliation.

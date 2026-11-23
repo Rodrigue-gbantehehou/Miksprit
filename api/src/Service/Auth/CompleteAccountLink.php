@@ -17,6 +17,7 @@ final readonly class CompleteAccountLink
         private UserRepository $users,
         private MembershipRepository $memberships,
         private UserPasswordHasherInterface $hasher,
+        private RefreshSessionStore $refreshSessions,
     ) {}
 
     public function complete(string $rawToken, string $rawPurpose, string $plainPassword): bool
@@ -35,12 +36,16 @@ final readonly class CompleteAccountLink
             return false;
         }
 
-        return $this->tokens->consumeAtomically($token, $now, function () use ($user, $plainPassword, $purpose): void {
-            $user->setPassword($this->hasher->hashPassword($user, $plainPassword));
-            $this->users->save($user);
+        $completed = $this->tokens->consumeAtomically($token, $now, function () use ($user, $plainPassword, $purpose): void {
+            if ($purpose === AccountLinkPurpose::PasswordReset || $user->requiresPasswordSetup()) {
+                $user->setPassword($this->hasher->hashPassword($user, $plainPassword));
+                $this->users->save($user);
+            }
             if ($purpose === AccountLinkPurpose::Invitation) {
                 $this->memberships->acceptInvitationsForActor($user->id());
             }
         });
+        if ($completed && $purpose === AccountLinkPurpose::PasswordReset) $this->refreshSessions->revokeUser($user->id());
+        return $completed;
     }
 }

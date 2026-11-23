@@ -84,6 +84,11 @@ final class Router implements TenantOwned
         return $this->ownerTenantId;
     }
 
+    public function credentialReference(): string
+    {
+        return $this->credentialReference;
+    }
+
     public function status(): RouterStatus
     {
         return $this->routerStatus;

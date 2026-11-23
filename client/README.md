@@ -16,6 +16,8 @@ npm run dev
 
 Next.js proxyfie `/api/v1/*` vers `API_INTERNAL_BASE` côté serveur. Gardez `NEXT_PUBLIC_API_BASE` à la valeur même origine `/api/v1`, et ne configurez pas une URL d'API cross-origin dans le navigateur : cela évite d'exposer un hôte interne et réduit les besoins CORS. `API_INTERNAL_BASE` est une configuration serveur; elle ne doit pas contenir de secret. La console propriétaire et le portail n’affichent que les données retournées par l’API; les écrans restent indisponibles si les endpoints ou l’authentification ne sont pas configurés.
 
+Le bouton « Se déconnecter » appelle `/api/v1/auth/logout` avec son jeton CSRF; il invalide le JWT serveur et supprime les cookies avant d'ouvrir la page centrale. Définir `NEXT_PUBLIC_LANDING_LOGIN_URL` sur l'URL HTTPS de connexion en production.
+
 ## API et diagnostic de connexion
 
 Les routes de santé, catalogue, checkout, statut de commande, webhook, authentification et console propriétaire sont déclarées dans `api/`. Démarrez d'abord Symfony sur le port 8000, puis Next.js. Le proxy Next réécrit `/api/v1/*` vers `API_INTERNAL_BASE` (par défaut `http://127.0.0.1:8000`); redémarrez Next.js après toute modification de cette variable ou de `next.config.ts`.

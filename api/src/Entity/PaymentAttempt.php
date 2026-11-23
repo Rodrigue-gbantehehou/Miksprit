@@ -11,7 +11,7 @@ use App\Entity\TenantId;
 
 #[ORM\Entity]
 #[ORM\Table(name: 'payment_attempts')]
-#[ORM\UniqueConstraint(name: 'uniq_provider_transaction', columns: ['provider', 'provider_reference'])]
+#[ORM\UniqueConstraint(name: 'uniq_tenant_provider_transaction', columns: ['tenant_id', 'provider', 'provider_reference'])]
 #[ORM\UniqueConstraint(name: 'uniq_payment_checkout_request', columns: ['checkout_request_key_hash'])]
 final class PaymentAttempt
 {

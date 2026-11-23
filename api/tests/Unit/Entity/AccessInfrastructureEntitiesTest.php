@@ -39,7 +39,7 @@ final class AccessInfrastructureEntitiesTest extends TestCase
     {
         $voucher = new Voucher('voucher_1', new TenantId('tenant_001'), 'site_0001', hash('sha256', 'voucher-code'));
         self::assertSame(VoucherStatus::Reserved, $voucher->status());
-        $voucher->markProvisioned('ciphertext-from-kms', new \DateTimeImmutable('+1 hour'));
+        $voucher->markProvisioned('ciphertext-from-kms', new \DateTimeImmutable('+1 hour'), 'w123456789012345');
         self::assertSame(VoucherStatus::Active, $voucher->status());
 
         $session = new HotspotSession('session_1', new TenantId('tenant_001'), 'router_001', 'voucher_1', 'ros-session-1');
@@ -54,6 +54,6 @@ final class AccessInfrastructureEntitiesTest extends TestCase
         $voucher = new Voucher('voucher_1', new TenantId('tenant_001'), 'site_0001', hash('sha256', 'voucher-code'));
 
         $this->expectException(\DomainException::class);
-        $voucher->markProvisioned('ciphertext-from-kms', new \DateTimeImmutable('-1 minute'));
+        $voucher->markProvisioned('ciphertext-from-kms', new \DateTimeImmutable('-1 minute'), 'w123456789012345');
     }
 }

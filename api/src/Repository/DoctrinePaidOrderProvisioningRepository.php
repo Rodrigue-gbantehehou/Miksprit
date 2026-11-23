@@ -47,13 +47,15 @@ final readonly class DoctrinePaidOrderProvisioningRepository implements PaidOrde
             ->setParameter('reference', $message->orderReference)->setParameter('tenant', $message->tenantId->value)
             ->getQuery()->getOneOrNullResult();
         if (!$order instanceof WifiOrder || $order->state() !== OrderState::AccessPending) return null;
-        $routerId = $this->connection->fetchOne(
+        $routerIds = $this->connection->fetchFirstColumn(
             "SELECT r.id FROM routers r
              INNER JOIN sites s ON s.id = r.site_id AND s.tenant_id = r.tenant_id AND s.status = 'active'
              INNER JOIN organizations o ON o.tenant_id = r.tenant_id AND o.organization_status = 'active'
-             WHERE r.site_id = ? AND r.tenant_id = ? AND r.status = ? ORDER BY r.created_at, r.id LIMIT 1",
+             WHERE r.site_id = ? AND r.tenant_id = ? AND r.status = ? ORDER BY r.created_at, r.id LIMIT 2",
             [$order->plan->siteId, $message->tenantId->value, \App\Entity\RouterStatus::Active->value],
         );
+        if (count($routerIds) !== 1) return null;
+        $routerId = $routerIds[0];
         $router = is_string($routerId) ? $this->entities->find(Router::class, $routerId) : null;
         if (!$router instanceof Router) return null;
         return new PaidOrderProvisioningContext($order, $router);

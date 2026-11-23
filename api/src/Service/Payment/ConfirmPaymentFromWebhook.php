@@ -23,7 +23,7 @@ final readonly class ConfirmPaymentFromWebhook implements PaymentWebhookConsumer
             return;
         }
 
-        $verifiedStatus = $this->providers->verify($event->provider, $event->providerReference);
+        $verifiedStatus = $this->providers->verify($event->provider, $event->providerReference, $event->tenantId);
         if ($verifiedStatus->provider !== $event->provider || $verifiedStatus->providerReference !== $event->providerReference) {
             throw new \DomainException('Verified PSP transaction does not match the webhook reference.');
         }

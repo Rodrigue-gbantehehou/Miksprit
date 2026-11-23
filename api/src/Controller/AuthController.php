@@ -23,6 +23,7 @@ use Symfony\Component\Security\Http\Event\LogoutEvent;
 use Symfony\Component\Security\Core\Authentication\Token\Storage\TokenStorageInterface;
 use Symfony\Component\DependencyInjection\Attribute\Autowire;
 use Psr\Log\LoggerInterface;
+use App\Service\Auth\RefreshSessionStore;
 
 final class AuthController extends AbstractController
 {
@@ -52,6 +53,7 @@ final class AuthController extends AbstractController
         UserPasswordHasherInterface $passwordHasher,
         AuthPayload $payload,
         JWTTokenManagerInterface $jwt,
+        RefreshSessionStore $refreshSessions,
         #[Autowire(service: 'limiter.auth_login')] RateLimiterFactory $limiter,
     ): JsonResponse {
         $data = $this->jsonBody($request);
@@ -70,22 +72,43 @@ final class AuthController extends AbstractController
             return new JsonResponse(['error' => 'Invalid email or password.'], 401, ['Cache-Control' => 'no-store']);
         }
         $token = $jwt->create($user);
+        $refresh = $refreshSessions->create($user->id());
         $response = new JsonResponse($payload->for($user), 200, ['Cache-Control' => 'no-store, private']);
-        $response->headers->setCookie(Cookie::create('MIKSPRIT_ACCESS')->withValue($token)->withExpires(time() + 900)->withPath('/')
-            ->withDomain($this->cookieDomain)->withSecure($request->isSecure() || $this->environment === 'prod')->withHttpOnly(true)->withSameSite(Cookie::SAMESITE_LAX));
+        $this->attachAuthCookies($response, $request, $token, $refresh['raw'], $refresh['expires']);
+        return $response;
+    }
+
+    #[Route('/api/v1/auth/refresh', name: 'api_auth_refresh', methods: ['POST'])]
+    public function refresh(Request $request, CsrfCookieManager $csrf, RefreshSessionStore $sessions, UserRepository $users, AuthPayload $payload, JWTTokenManagerInterface $jwt): JsonResponse
+    {
+        $data = $this->jsonBody($request);
+        if (!$csrf->isValid($request, $data)) return new JsonResponse(['error' => 'Invalid request.'], 400, ['Cache-Control' => 'no-store']);
+        $old = $request->cookies->get('MIKSPRIT_REFRESH');
+        $rotated = is_string($old) ? $sessions->rotate($old) : null;
+        $user = $rotated === null ? null : $users->findById($rotated['user_id']);
+        if ($user === null || !$user->isActive()) {
+            if ($rotated !== null) $sessions->revoke($rotated['raw']);
+            $response = new JsonResponse(['error' => 'Session expired.'], 401, ['Cache-Control' => 'no-store']);
+            $this->clearAuthCookies($response, $request);
+            return $response;
+        }
+        $response = new JsonResponse($payload->for($user), 200, ['Cache-Control' => 'no-store, private']);
+        $this->attachAuthCookies($response, $request, $jwt->create($user), $rotated['raw'], $rotated['expires']);
         return $response;
     }
 
     #[Route('/api/v1/auth/logout', name: 'api_auth_logout', methods: ['POST'])]
-    public function logout(Request $request, CsrfCookieManager $csrf, EventDispatcherInterface $dispatcher, TokenStorageInterface $tokens): JsonResponse
+    public function logout(Request $request, CsrfCookieManager $csrf, EventDispatcherInterface $dispatcher, TokenStorageInterface $tokens, RefreshSessionStore $sessions): JsonResponse
     {
         $data = $this->jsonBody($request);
         if (!$csrf->isValid($request, $data)) {
             return new JsonResponse(['error' => 'Invalid request.'], 400, ['Cache-Control' => 'no-store']);
         }
         $dispatcher->dispatch(new LogoutEvent($request, $tokens->getToken()));
+        $refresh = $request->cookies->get('MIKSPRIT_REFRESH');
+        if (is_string($refresh)) $sessions->revoke($refresh);
         $response = new JsonResponse(null, 204, ['Cache-Control' => 'no-store']);
-        foreach (['MIKSPRIT_ACCESS', CsrfCookieManager::COOKIE_NAME] as $name) {
+        foreach (['MIKSPRIT_ACCESS', 'MIKSPRIT_REFRESH', CsrfCookieManager::COOKIE_NAME] as $name) {
             $response->headers->clearCookie($name, '/', $this->cookieDomain, $request->isSecure() || $this->environment === 'prod', true, Cookie::SAMESITE_LAX);
         }
         return $response;
@@ -164,6 +187,22 @@ final class AuthController extends AbstractController
             return is_array($data) ? $data : [];
         } catch (\Throwable) {
             return [];
+        }
+    }
+
+    private function attachAuthCookies(JsonResponse $response, Request $request, string $access, string $refresh, int $refreshExpires): void
+    {
+        $secure = $request->isSecure() || $this->environment === 'prod';
+        $response->headers->setCookie(Cookie::create('MIKSPRIT_ACCESS')->withValue($access)->withExpires(time() + 900)->withPath('/')
+            ->withDomain($this->cookieDomain)->withSecure($secure)->withHttpOnly(true)->withSameSite(Cookie::SAMESITE_LAX));
+        $response->headers->setCookie(Cookie::create('MIKSPRIT_REFRESH')->withValue($refresh)->withExpires($refreshExpires)->withPath('/')
+            ->withDomain($this->cookieDomain)->withSecure($secure)->withHttpOnly(true)->withSameSite(Cookie::SAMESITE_LAX));
+    }
+
+    private function clearAuthCookies(JsonResponse $response, Request $request): void
+    {
+        foreach (['MIKSPRIT_ACCESS', 'MIKSPRIT_REFRESH'] as $name) {
+            $response->headers->clearCookie($name, '/', $this->cookieDomain, $request->isSecure() || $this->environment === 'prod', true, Cookie::SAMESITE_LAX);
         }
     }
 

@@ -1,0 +1,14 @@
+# Install under the dedicated API service account with: crontab miksprit.cron
+# Replace the paths and PHP_BIN with values from the production host.
+SHELL=/bin/bash
+PATH=/usr/local/sbin:/usr/local/bin:/usr/sbin:/usr/bin:/sbin:/bin
+MIKSPRIT_API_DIR=/srv/miksprit/api
+MIKSPRIT_LOCK_DIR=/var/lock/miksprit
+MIKSPRIT_LOG_DIR=/var/log/miksprit
+PHP_BIN=/usr/bin/php
+
+* * * * * /bin/bash /srv/miksprit/deploy/run-scheduled-task.sh payments
+* * * * * /bin/bash /srv/miksprit/deploy/run-scheduled-task.sh vouchers
+* * * * * /bin/bash /srv/miksprit/deploy/run-scheduled-task.sh subscriptions
+* * * * * /bin/bash /srv/miksprit/deploy/run-scheduled-task.sh router-sessions
+15 3 * * * /bin/bash /srv/miksprit/deploy/run-scheduled-task.sh refresh-sessions

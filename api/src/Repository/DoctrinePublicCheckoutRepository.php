@@ -9,6 +9,7 @@ use App\Entity\PlanSnapshot;
 use App\Entity\TenantId;
 use App\Entity\WifiOrder;
 use App\Entity\XofAmount;
+use App\Service\Subscription\TenantSubscriptionAccess;
 use Doctrine\DBAL\Connection;
 use Doctrine\ORM\EntityManagerInterface;
 use Symfony\Component\DependencyInjection\Attribute\AsAlias;
@@ -16,7 +17,7 @@ use Symfony\Component\DependencyInjection\Attribute\AsAlias;
 #[AsAlias(PublicCheckoutRepository::class)]
 final readonly class DoctrinePublicCheckoutRepository implements PublicCheckoutRepository
 {
-    public function __construct(private Connection $connection, private EntityManagerInterface $entities)
+    public function __construct(private Connection $connection, private EntityManagerInterface $entities, private TenantSubscriptionAccess $subscriptionAccess)
     {
     }
 
@@ -30,10 +31,12 @@ final readonly class DoctrinePublicCheckoutRepository implements PublicCheckoutR
              INNER JOIN sites s ON s.id = p.site_id AND s.tenant_id = p.tenant_id
              INNER JOIN organizations o ON o.tenant_id = s.tenant_id
              WHERE p.id = :planId AND p.site_id = :siteId AND p.publication_state = :published
-               AND s.status = :siteActive AND o.organization_status = :orgActive',
-            ['planId' => $planId, 'siteId' => $siteId, 'published' => 'published', 'siteActive' => 'active', 'orgActive' => 'active'],
+               AND s.status = :siteActive AND o.organization_status = :orgActive
+               AND (SELECT COUNT(*) FROM routers r WHERE r.tenant_id = s.tenant_id AND r.site_id = s.id AND r.status = :routerActive) = 1',
+            ['planId' => $planId, 'siteId' => $siteId, 'published' => 'published', 'siteActive' => 'active', 'orgActive' => 'active', 'routerActive' => 'active'],
         );
         if ($row === false) return null;
+        if (!$this->subscriptionAccess->mayOperate(new TenantId((string) $row['tenant_id']))) return null;
         return new PlanSnapshot((string) $row['id'], (string) $row['site_id'], new TenantId((string) $row['tenant_id']),
             (int) $row['version'], (string) $row['name'], new XofAmount((int) $row['price_minor_units']),
             (int) $row['session_seconds'], $row['data_limit_bytes'] === null ? null : (int) $row['data_limit_bytes'], (int) $row['device_limit']);

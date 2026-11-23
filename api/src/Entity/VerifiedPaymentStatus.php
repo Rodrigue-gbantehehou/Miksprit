@@ -20,12 +20,14 @@ final readonly class VerifiedPaymentStatus
         public ?int $providerFeeMinorUnits = null,
         public ?int $amountTransferredMinorUnits = null,
         public bool $settled = false,
+        public ?string $tenantId = null,
     ) {
         foreach ([$provider, $providerReference, $merchantReference] as $value) {
             if ($value === '' || strlen($value) > 200) {
                 throw new \InvalidArgumentException('Provider and references must be present and bounded.');
             }
         }
+        if ($tenantId !== null && (trim($tenantId) === '' || strlen($tenantId) > 80)) throw new \InvalidArgumentException('Payment tenant identifier is invalid.');
         if ($currency !== 'XOF') {
             throw new \InvalidArgumentException('Only XOF is supported.');
         }

@@ -9,23 +9,52 @@ use App\Entity\VerifiedPaymentStatus;
 use App\Entity\XofAmount;
 use App\Event\PaymentWebhookEvent;
 use App\Service\Payment\PaymentIntent;
-use App\Service\Payment\PaymentProviderAdapter;
+use App\Service\Payment\TenantPaymentProviderAdapter;
 use App\Service\Payment\PaymentSession;
+use App\Service\Payment\TenantPaymentSettings;
 use Symfony\Component\DependencyInjection\Attribute\AutoconfigureTag;
 
 #[AutoconfigureTag('miksprit.payment_provider')]
-final readonly class FedaPayGateway implements PaymentProviderAdapter
+final readonly class FedaPayGateway implements TenantPaymentProviderAdapter
 {
-    public function __construct(private FedaPayConfiguration $configuration, private JsonHttpClient $http, private WebhookSignatureValidator $signatures)
+    public function __construct(private FedaPayConfiguration $configuration, private JsonHttpClient $http, private WebhookSignatureValidator $signatures, private TenantPaymentSettings $tenantSettings)
     {
     }
 
     public function code(): string { return 'fedapay'; }
     public function canCreateCheckout(): bool { return $this->configuration->canCreatePayments() && $this->configuration->canValidateWebhooks(); }
+    public function tenantFeatureEnabled(): bool { return $this->configuration->enabled; }
 
     public function createCheckout(PaymentIntent $intent, string $idempotencyKey): PaymentSession
     {
         $this->assertAvailable();
+        return $this->createCheckoutUsing($intent, $idempotencyKey, $this->configuration);
+    }
+
+    /** @param array{apiKey: string, webhookSecret: string, environment: string} $credentials */
+    public function canCreateCheckoutForTenant(array $credentials): bool
+    {
+        return $this->tenantConfiguration($credentials)->canCreatePayments()
+            && $this->tenantConfiguration($credentials)->canValidateWebhooks();
+    }
+
+    public function testTenantCredentials(array $credentials): void
+    {
+        $configuration = $this->tenantConfiguration($credentials, enabledOverride: true);
+        if (!$configuration->canCreatePayments() || !$configuration->canValidateWebhooks()) throw new PaymentProviderUnavailable('FedaPay credentials or platform environment are not configured.');
+        $this->request('GET', '/transactions/search', configuration: $configuration);
+    }
+
+    /** @param array{apiKey: string, webhookSecret: string, environment: string} $credentials */
+    public function createTenantCheckout(PaymentIntent $intent, string $idempotencyKey, array $credentials): PaymentSession
+    {
+        $configuration = $this->tenantConfiguration($credentials);
+        if (!$configuration->canCreatePayments() || !$configuration->canValidateWebhooks()) throw new PaymentProviderUnavailable('FedaPay tenant credentials or platform environment are not configured.');
+        return $this->createCheckoutUsing($intent, $idempotencyKey, $configuration);
+    }
+
+    private function createCheckoutUsing(PaymentIntent $intent, string $idempotencyKey, FedaPayConfiguration $configuration): PaymentSession
+    {
         if ($idempotencyKey === '' || strlen($idempotencyKey) > 200) throw new \InvalidArgumentException('Payment idempotency key is invalid.');
         $payload = [
             'description' => $intent->description,
@@ -43,11 +72,11 @@ final readonly class FedaPayGateway implements PaymentProviderAdapter
             }
             $payload['customer'] = $customer;
         }
-        $transaction = self::resource($this->request('POST', '/transactions', $payload), 'transaction');
+        $transaction = self::resource($this->request('POST', '/transactions', $payload, $configuration), 'transaction');
         $id = $transaction['id'] ?? null;
         if (!is_string($id) && !is_int($id)) throw new PaymentProviderUnavailable('FedaPay did not return a transaction identifier.');
         try {
-            return $this->hostedSession((string) $id);
+            return $this->hostedSession((string) $id, $configuration);
         } catch (PaymentProviderUnavailable $exception) {
             throw new CheckoutTokenUnavailable((string) $id, $exception);
         }
@@ -59,12 +88,21 @@ final readonly class FedaPayGateway implements PaymentProviderAdapter
         if ($providerReference === '' || strlen($providerReference) > 200 || $idempotencyKey === '' || strlen($idempotencyKey) > 200) {
             throw new \InvalidArgumentException('FedaPay checkout retry reference is invalid.');
         }
-        return $this->hostedSession($providerReference);
+        return $this->hostedSession($providerReference, $this->configuration);
     }
 
-    private function hostedSession(string $providerReference): PaymentSession
+    /** @param array{apiKey: string, webhookSecret: string, environment: string} $credentials */
+    public function resumeTenantCheckout(string $providerReference, string $idempotencyKey, array $credentials): PaymentSession
     {
-        $token = self::resource($this->request('POST', '/transactions/'.rawurlencode($providerReference).'/token'), 'token');
+        $configuration = $this->tenantConfiguration($credentials);
+        if (!$configuration->canCreatePayments() || !$configuration->canValidateWebhooks()) throw new PaymentProviderUnavailable('FedaPay tenant credentials or platform environment are not configured.');
+        if ($providerReference === '' || strlen($providerReference) > 200 || $idempotencyKey === '' || strlen($idempotencyKey) > 200) throw new \InvalidArgumentException('FedaPay checkout retry reference is invalid.');
+        return $this->hostedSession($providerReference, $configuration);
+    }
+
+    private function hostedSession(string $providerReference, ?FedaPayConfiguration $configuration = null): PaymentSession
+    {
+        $token = self::resource($this->request('POST', '/transactions/'.rawurlencode($providerReference).'/token', configuration: $configuration), 'token');
         $url = $token['url'] ?? $token['payment_url'] ?? null;
         $parts = is_string($url) ? parse_url($url) : false;
         $host = is_array($parts) ? strtolower((string) ($parts['host'] ?? '')) : '';
@@ -78,8 +116,13 @@ final readonly class FedaPayGateway implements PaymentProviderAdapter
     public function verify(string $providerReference): VerifiedPaymentStatus
     {
         $this->assertAvailable();
+        return $this->verifyUsing($providerReference, $this->configuration);
+    }
+
+    private function verifyUsing(string $providerReference, FedaPayConfiguration $configuration, ?string $tenantId = null): VerifiedPaymentStatus
+    {
         if ($providerReference === '' || strlen($providerReference) > 200) throw new \InvalidArgumentException('FedaPay transaction reference is invalid.');
-        $transaction = self::resource($this->request('GET', '/transactions/'.rawurlencode($providerReference)), 'transaction');
+        $transaction = self::resource($this->request('GET', '/transactions/'.rawurlencode($providerReference), configuration: $configuration), 'transaction');
         $reference = $transaction['id'] ?? null;
         $merchantReference = $transaction['custom_metadata']['merchant_reference'] ?? $transaction['merchant_reference'] ?? null;
         $amount = $transaction['amount'] ?? null;
@@ -96,12 +139,58 @@ final readonly class FedaPayGateway implements PaymentProviderAdapter
             throw new PaymentProviderUnavailable('FedaPay transaction settlement amounts are invalid.');
         }
         $isSettled = strtolower($status) === 'transferred' && $fee !== null && $transferred !== null;
-        return new VerifiedPaymentStatus('fedapay', (string) $reference, (string) $merchantReference, new XofAmount((int) $amount), strtoupper($currency), self::mapStatus($status), new \DateTimeImmutable(), $fee === null ? null : (int) $fee, $transferred === null ? null : (int) $transferred, $isSettled);
+        return new VerifiedPaymentStatus('fedapay', (string) $reference, (string) $merchantReference, new XofAmount((int) $amount), strtoupper($currency), self::mapStatus($status), new \DateTimeImmutable(), $fee === null ? null : (int) $fee, $transferred === null ? null : (int) $transferred, $isSettled, $tenantId ?? null);
     }
 
     public function validateWebhook(string $rawBody, ?string $signature): bool { return $this->signatures->isValid($rawBody, $signature); }
     public function webhookSignatureHeader(): string { return 'X-FEDAPAY-SIGNATURE'; }
     public function parseWebhook(string $rawBody): PaymentWebhookEvent { return FedaPayWebhookParser::parse($rawBody); }
+
+    public function verifyTenantPayment(string $providerReference, ?string $tenantId = null): VerifiedPaymentStatus
+    {
+        $candidates = $tenantId === null
+            ? $this->tenantSettings->forPaymentReference($this->code(), $providerReference)
+            : array_filter([$this->tenantSettings->forTenant($tenantId)]);
+        if ($tenantId === null && count($candidates) > 1) throw new PaymentProviderUnavailable('FedaPay transaction reference is ambiguous across tenants.');
+        $settings = $candidates === [] ? null : reset($candidates);
+        if ($settings === null) return $this->verify($providerReference); // Historical global-config transactions remain reconcilable.
+        if ($settings['provider'] !== $this->code()) throw new PaymentProviderUnavailable('FedaPay merchant configuration does not match the transaction.');
+        $configuration = $this->tenantConfiguration(['apiKey' => $settings['apiKey'], 'webhookSecret' => $settings['webhookSecret'], 'environment' => $settings['environment']]);
+        if (!$configuration->canCreatePayments()) throw new PaymentProviderUnavailable('FedaPay merchant configuration is unavailable.');
+        return $this->verifyUsing($providerReference, $configuration, $settings['tenantId']);
+    }
+
+    public function parseTenantWebhook(string $rawBody, ?string $signature): PaymentWebhookEvent
+    {
+        $event = FedaPayWebhookParser::parse($rawBody);
+        $candidates = $this->tenantSettings->forPaymentReference($this->code(), $event->providerReference);
+        if ($candidates === []) {
+            if (!$this->validateWebhook($rawBody, $signature)) throw new \UnexpectedValueException('Webhook signature is invalid.');
+            return $event; // Existing legacy transactions use the previous platform webhook secret.
+        }
+        $matched = [];
+        foreach ($candidates as $settings) {
+            if ($this->signatures->isValid($rawBody, $signature, $settings['webhookSecret'])) $matched[] = $settings;
+        }
+        if (count($matched) !== 1) throw new \UnexpectedValueException('Webhook signature did not identify exactly one tenant.');
+        return FedaPayWebhookParser::parse($rawBody, $matched[0]['tenantId']);
+    }
+
+    /** @param array{apiKey: string, webhookSecret: string, environment: string} $credentials */
+    private function tenantConfiguration(array $credentials, ?bool $enabledOverride = null): FedaPayConfiguration
+    {
+        foreach ([$credentials['apiKey'] ?? null, $credentials['webhookSecret'] ?? null] as $secret) {
+            if (!is_string($secret) || trim($secret) === '' || strlen($secret) > 500 || preg_match('/[\x00-\x1F\x7F]/', $secret) === 1) {
+                throw new PaymentProviderUnavailable('FedaPay merchant credentials are invalid.');
+            }
+        }
+        $baseUrl = match ($credentials['environment']) {
+            'test' => 'https://sandbox-api.fedapay.com/v1',
+            'live' => 'https://api.fedapay.com/v1',
+            default => throw new PaymentProviderUnavailable('FedaPay environment is not supported.'),
+        };
+        return new FedaPayConfiguration($enabledOverride ?? $this->configuration->enabled, $credentials['apiKey'], $credentials['webhookSecret'], $baseUrl);
+    }
 
     private function assertAvailable(): void
     {
@@ -151,10 +240,11 @@ final readonly class FedaPayGateway implements PaymentProviderAdapter
     }
 
     /** @param array<string, mixed>|null $payload @return array<string, mixed> */
-    private function request(string $method, string $path, ?array $payload = null): array
+    private function request(string $method, string $path, ?array $payload = null, ?FedaPayConfiguration $configuration = null): array
     {
-        $response = $this->http->request($method, rtrim((string) $this->configuration->baseUrl, '/').$path, [
-            'Authorization' => 'Bearer '.(string) $this->configuration->secretKey,
+        $configuration ??= $this->configuration;
+        $response = $this->http->request($method, rtrim((string) $configuration->baseUrl, '/').$path, [
+            'Authorization' => 'Bearer '.(string) $configuration->secretKey,
             'Content-Type' => 'application/json',
         ], $payload);
         if ($response->statusCode < 200 || $response->statusCode >= 300) throw new PaymentProviderUnavailable('FedaPay rejected the payment operation (HTTP '.$response->statusCode.').');

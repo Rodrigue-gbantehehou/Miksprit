@@ -102,7 +102,7 @@ final readonly class DoctrineOwnerReadRepository implements OwnerReadRepository
     public function transactions(TenantContext $context): array
     {
         $rows = $this->connection->fetchAllAssociative(
-            'SELECT p.id, o.public_reference, p.expected_minor_units, p.state, o.created_at,
+            'SELECT p.id, o.public_reference, p.expected_minor_units, p.state, o.created_at, o.platform_commission_bps,
                     s.provider_fee_minor_units, s.commission_minor_units, s.operator_net_minor_units, s.state AS settlement_state
              FROM payment_attempts p
              INNER JOIN wifi_orders o ON o.tenant_id = p.tenant_id AND o.public_reference = p.order_reference
@@ -120,7 +120,8 @@ final readonly class DoctrineOwnerReadRepository implements OwnerReadRepository
             'providerFeeXof' => $row['provider_fee_minor_units'] === null ? null : (int) $row['provider_fee_minor_units'],
             'commissionXof' => $row['commission_minor_units'] === null ? null : (int) $row['commission_minor_units'],
             'operatorNetXof' => $row['operator_net_minor_units'] === null ? null : (int) $row['operator_net_minor_units'],
-            'settlementStatus' => (string) ($row['settlement_state'] ?? 'awaiting_payment'),
+            'settlementStatus' => $row['platform_commission_bps'] === null
+                ? 'direct_to_merchant' : (string) ($row['settlement_state'] ?? 'awaiting_settlement'),
             'status' => (string) $row['state'],
             'createdAt' => (new \DateTimeImmutable((string) $row['created_at']))->format(DATE_ATOM),
         ], $rows);

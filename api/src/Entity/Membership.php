@@ -127,6 +127,27 @@ final class Membership
         $this->revokedAt = $revokedAt ?? new \DateTimeImmutable();
     }
 
+    public function reinvite(TenantContext $actor, TenantRole $role): void
+    {
+        $this->assertMembershipManager($actor);
+        if ($this->membershipRole === TenantRole::Owner || $this->membershipStatus !== MembershipStatus::Revoked || $role === TenantRole::Owner) {
+            throw new \DomainException('Only a revoked non-owner membership can be invited again.');
+        }
+        $this->membershipRole = $role;
+        $this->membershipStatus = MembershipStatus::Invited;
+        $this->acceptedAt = null;
+        $this->revokedAt = null;
+    }
+
+    public function changeInvitationRole(TenantContext $actor, TenantRole $role): void
+    {
+        $this->assertMembershipManager($actor);
+        if ($this->membershipRole === TenantRole::Owner || $this->membershipStatus !== MembershipStatus::Invited || $role === TenantRole::Owner) {
+            throw new \DomainException('Only an invited non-owner membership role can be changed.');
+        }
+        $this->membershipRole = $role;
+    }
+
     public function changeRole(TenantContext $actor, TenantRole $role): void
     {
         $this->assertMembershipManager($actor);

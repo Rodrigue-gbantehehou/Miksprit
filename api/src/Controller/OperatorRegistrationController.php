@@ -57,8 +57,6 @@ final readonly class OperatorRegistrationController
         try {
             $account = $registration->execute(
                 $email,
-                is_string($data['organizationName'] ?? null) ? $data['organizationName'] : '',
-                is_string($data['organizationSlug'] ?? null) ? $data['organizationSlug'] : '',
                 is_string($data['password'] ?? null) ? $data['password'] : '',
             );
         } catch (\InvalidArgumentException) {
@@ -71,7 +69,7 @@ final readonly class OperatorRegistrationController
         }
 
         return new JsonResponse([
-            'message' => 'Votre compte et votre espace propriétaire sont créés. Vous pouvez vous connecter.',
+            'message' => 'Votre compte est créé. Connectez-vous pour créer votre espace Miksprit et vos sites.',
             ...$account,
         ], JsonResponse::HTTP_CREATED, ['Cache-Control' => 'no-store']);
     }

@@ -8,8 +8,8 @@ use Doctrine\ORM\Mapping as ORM;
 
 #[ORM\Entity]
 #[ORM\Table(name: 'hotspot_sessions')]
-#[ORM\UniqueConstraint(name: 'uniq_router_external_session', columns: ['router_id', 'external_session_id'])]
 #[ORM\Index(name: 'idx_session_tenant_state', columns: ['tenant_id', 'state'])]
+#[ORM\Index(name: 'idx_session_router_external_state', columns: ['router_id', 'external_session_id', 'state'])]
 final class HotspotSession implements TenantOwned
 {
     #[ORM\Id]

@@ -5,6 +5,7 @@
   const apiBase = (body.dataset.apiBase || new URL('/api/v1', window.location.origin).toString()).replace(/\/$/, '');
   const siteId = new URLSearchParams(window.location.search).get('siteId') || body.dataset.siteId || '';
   const planList = document.querySelector('#plans');
+  const siteName = document.querySelector('#site-name');
   const message = document.querySelector('#message');
   const checkoutForm = document.querySelector('#checkout-form');
   const orderStatus = document.querySelector('#order-status');
@@ -26,17 +27,17 @@
     const payload = await response.json().catch(() => ({}));
     if (!response.ok) {
       if (response.status === 404 && path.includes('/plans')) {
-        throw new Error('Ce portail Wi-Fi est introuvable ou momentanément désactivé. Vérifiez le lien reçu ou demandez de l’aide au personnel sur place.');
+        throw new Error('Portail introuvable. Vérifiez le lien.');
       }
-      if (response.status === 429) throw new Error('Trop de demandes depuis ce réseau. Patientez quelques minutes avant de réessayer.');
-      if (payload.error === 'plan_not_available') throw new Error('Ce forfait n’est plus disponible. Actualisez la page pour voir les offres en cours.');
-      if (payload.error === 'payment_temporarily_unavailable') throw new Error('Le paiement est momentanément indisponible. Réessayez plus tard ou demandez de l’aide au personnel.');
+      if (response.status === 429) throw new Error('Trop de demandes. Réessayez plus tard.');
+      if (payload.error === 'plan_not_available') throw new Error('Ce ticket n’est plus disponible. Actualisez la page.');
+      if (payload.error === 'payment_temporarily_unavailable') throw new Error('Paiement indisponible. Réessayez plus tard.');
       if (payload.error === 'checkout_in_progress' && typeof payload.orderReference === 'string') {
-        const conflict = new Error('Cette demande a déjà créé une commande. Vérification de son état…');
+        const conflict = new Error('Commande déjà créée. Vérification du paiement…');
         conflict.orderReference = payload.orderReference;
         throw conflict;
       }
-      throw new Error('Les forfaits sont momentanément indisponibles. Réessayez plus tard ou demandez de l’aide au personnel sur place.');
+      throw new Error('Tickets indisponibles. Réessayez plus tard.');
     }
     return payload;
   }
@@ -71,7 +72,8 @@
     details.className = 'plan-details';
     const name = document.createElement('h3');
     name.className = 'plan-name';
-    name.textContent = String(plan.name ?? plan.title ?? 'Forfait Wi-Fi');
+    const planName = String(plan.name ?? plan.title ?? 'Ticket Wi-Fi');
+    name.textContent = planName;
     details.append(name);
     const descriptionText = plan.description;
     if (typeof descriptionText === 'string' && descriptionText.trim()) {
@@ -112,14 +114,23 @@
     const button = document.createElement('button');
     button.className = 'choose-button';
     button.type = 'button';
-    button.textContent = 'Choisir ce forfait';
+    button.textContent = 'Choisir';
+    button.setAttribute('aria-label', `Choisir ${planName}`);
+    button.setAttribute('aria-pressed', 'false');
     button.addEventListener('click', () => {
       selectedPlan = plan;
       checkoutRequestKey = null;
-      document.querySelectorAll('.plan-card').forEach((item) => item.classList.remove('is-selected'));
+      document.querySelectorAll('.plan-card').forEach((item) => {
+        item.classList.remove('is-selected');
+        const choice = item.querySelector('.choose-button');
+        choice.setAttribute('aria-pressed', 'false');
+        choice.textContent = 'Choisir';
+      });
       card.classList.add('is-selected');
+      button.setAttribute('aria-pressed', 'true');
+      button.textContent = 'Choisi';
       checkoutForm.hidden = false;
-      checkoutForm.querySelector('h3').textContent = `Payer ${String(plan.name ?? 'ce forfait')} · ${price === null ? '' : `${currency.format(price)} XOF`}`;
+      checkoutForm.querySelector('h3').textContent = `Payer ${planName} · ${price === null ? '' : `${currency.format(price)} XOF`}`;
       checkoutForm.querySelector('input').focus();
     });
     card.append(button);
@@ -128,27 +139,30 @@
 
   async function loadPlans() {
     if (!apiBase || !siteId) {
-      setMessage('Identifiant de site manquant. Ouvrez le lien du portail fourni par le lieu ou demandez de l’aide au personnel.', true);
+      setMessage('Site Wi-Fi manquant dans le lien.', true);
       planList.replaceChildren();
       planList.setAttribute('aria-busy', 'false');
       return;
     }
-    planList.innerHTML = '<div class="loading-line"><span><i class="spinner" aria-hidden="true"></i> Chargement des forfaits…</span></div>';
+    planList.innerHTML = '<div class="loading-line"><span><i class="spinner" aria-hidden="true"></i> Chargement des tickets…</span></div>';
     try {
       const payload = await request(`/public/sites/${encodeURIComponent(siteId)}/plans`);
       if (payload.site?.id !== siteId || !Array.isArray(payload.plans)) {
-        throw new Error('Le catalogue reçu est invalide. Réessayez plus tard ou demandez de l’aide au personnel.');
+        throw new Error('Tickets indisponibles. Réessayez plus tard.');
+      }
+      if (typeof payload.site.name === 'string' && payload.site.name.trim()) {
+        siteName.textContent = payload.site.name.trim();
+        document.title = `${payload.site.name.trim()} — Tickets Wi-Fi`;
       }
       const plans = plansFrom(payload).map(planCard).filter(Boolean);
       planList.replaceChildren();
       if (!plans.length) {
-        setMessage('Aucun forfait n’est disponible sur ce réseau pour le moment. Demandez de l’aide au personnel sur place.');
+        setMessage('Aucun ticket disponible.');
       } else {
         plans.forEach((plan) => planList.append(plan));
-        setMessage('Choisissez un forfait pour commencer. Le paiement est confirmé côté serveur avant l’activation de votre accès.');
       }
     } catch (error) {
-      setMessage(error instanceof Error ? error.message : 'Les forfaits ne peuvent pas être chargés. Réessayez plus tard.', true);
+      setMessage(error instanceof Error ? error.message : 'Chargement impossible.', true);
       planList.replaceChildren();
     } finally {
       planList.setAttribute('aria-busy', 'false');
@@ -177,7 +191,7 @@
       });
       const checkout = new URL(result.checkoutUrl);
       if (checkout.protocol !== 'https:' || !(checkout.hostname === 'fedapay.com' || checkout.hostname.endsWith('.fedapay.com'))) {
-        throw new Error('Le lien de paiement reçu n’est pas valide. Contactez le personnel sur place.');
+        throw new Error('Lien de paiement invalide. Contactez le personnel.');
       }
       window.location.assign(checkout.href);
     } catch (error) {
@@ -185,7 +199,7 @@
         void pollPayment(error.orderReference);
         return;
       }
-      setMessage(error instanceof Error ? error.message : 'Le paiement ne peut pas démarrer. Réessayez plus tard.', true);
+      setMessage(error instanceof Error ? error.message : 'Paiement impossible. Réessayez.', true);
       submit.disabled = false;
       submit.textContent = 'Continuer vers le paiement';
     }
@@ -195,12 +209,12 @@
 
   async function pollPayment(orderReference) {
     orderStatus.hidden = false;
-    orderStatus.textContent = 'Vérification du paiement auprès du serveur…';
+    orderStatus.textContent = 'Vérification du paiement…';
     for (let attempt = 0; attempt < 30; attempt += 1) {
       try {
         const result = await request(`/public/orders/${encodeURIComponent(orderReference)}/status`);
         if (result.accessExpired) {
-          showOrderMessage('Accès expiré', 'Ce forfait a atteint sa date d’expiration. Choisissez un nouveau forfait pour vous reconnecter.');
+          showOrderMessage('Accès expiré', 'Choisissez un nouveau ticket.');
           return;
         }
         if (result.paymentStatus === 'succeeded' && result.orderStatus === 'fulfilled' && result.access) {
@@ -208,26 +222,32 @@
           return;
         }
         if (['failed', 'expired'].includes(result.paymentStatus)) {
-          showOrderMessage('Paiement non confirmé', 'Aucun accès n’a été activé. Vous pouvez choisir un forfait et recommencer.');
+          showOrderMessage('Paiement non confirmé', 'Aucun accès activé. Vous pouvez réessayer.');
           return;
         }
         if (result.paymentStatus === 'succeeded' && result.orderStatus === 'provisioning_failed') {
-          showOrderMessage('Paiement confirmé · assistance requise', 'Le routeur n’a pas confirmé l’activation de votre accès. Présentez cette page au personnel sur place.');
+          showOrderMessage('Paiement confirmé', 'Activation impossible. Contactez le personnel.');
           return;
         }
         if (result.paymentStatus === 'initiated') {
-          orderStatus.textContent = 'La demande de paiement est en cours de vérification. Ne recommencez pas le paiement; demandez de l’aide au personnel avec cette référence.';
+          orderStatus.textContent = 'Paiement en vérification. Ne payez pas à nouveau.';
         } else {
         orderStatus.textContent = result.paymentStatus === 'succeeded'
           ? 'Paiement confirmé. Activation de votre accès Wi-Fi en cours…'
-          : 'Paiement en attente de confirmation sécurisée…';
+          : 'Paiement en attente…';
         }
       } catch {
-        orderStatus.textContent = 'La confirmation n’est pas encore disponible. Actualisez dans quelques instants.';
+        orderStatus.textContent = 'Confirmation en attente. Actualisez bientôt.';
       }
       await new Promise((resolve) => window.setTimeout(resolve, Math.min(2000 + attempt * 250, 7000)));
     }
-    orderStatus.textContent = 'Le paiement n’a pas encore été confirmé. Gardez cette page ouverte ou demandez de l’aide au personnel.';
+    orderStatus.replaceChildren(document.createTextNode('Paiement toujours en attente. Vous pouvez vérifier à nouveau.'));
+    const retry = document.createElement('button');
+    retry.className = 'choose-button';
+    retry.type = 'button';
+    retry.textContent = 'Vérifier encore';
+    retry.addEventListener('click', () => { void pollPayment(orderReference); });
+    orderStatus.append(retry);
   }
 
   function showOrderMessage(title, description) {

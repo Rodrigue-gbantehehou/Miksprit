@@ -10,9 +10,11 @@ use App\Service\Owner\CreateOwnerOrganization;
 use App\Service\Owner\OwnerOrganizationConflict;
 use App\Service\Owner\OwnerTenantContextUnavailable;
 use App\Service\Owner\OwnerWriteService;
+use App\Service\Owner\OwnerHotspotSessionReader;
 use App\Service\Auth\CsrfCookieManager;
 use App\Service\Owner\OwnerTenantSelectionRequired;
 use App\Service\Owner\ResolveOwnerContext;
+use App\Service\Subscription\TenantSubscriptionAccess;
 use App\Service\Router\RouterDriverRegistry;
 use Symfony\Bundle\FrameworkBundle\Controller\AbstractController;
 use Symfony\Component\HttpFoundation\JsonResponse;
@@ -27,6 +29,8 @@ final class OwnerReadController extends AbstractController
         private readonly OwnerReadService $reads,
         private readonly OwnerWriteService $writes,
         private readonly RouterDriverRegistry $routerDrivers,
+        private readonly TenantSubscriptionAccess $subscriptionAccess,
+        private readonly OwnerHotspotSessionReader $sessionReader,
     ) {
     }
 
@@ -64,6 +68,12 @@ final class OwnerReadController extends AbstractController
     public function transactions(Request $request): JsonResponse
     {
         return $this->respond($request, fn ($context) => $this->reads->transactions($context));
+    }
+
+    #[Route('/sessions', name: 'sessions', methods: ['GET'])]
+    public function sessions(Request $request): JsonResponse
+    {
+        return $this->respond($request, fn ($context) => ['items' => $this->sessionReader->list($context)]);
     }
 
     #[Route('/organizations', name: 'organizations', methods: ['GET'])]
@@ -112,7 +122,7 @@ final class OwnerReadController extends AbstractController
     public function createSite(Request $request, CsrfCookieManager $csrf): JsonResponse
     {
         return $this->mutate($request, $csrf, fn ($context, array $data) => $this->writes->createSite($context,
-            is_string($data['name'] ?? null) ? $data['name'] : '', is_string($data['slug'] ?? null) ? $data['slug'] : ''), 201);
+            is_string($data['name'] ?? null) ? $data['name'] : ''), 201);
     }
 
     #[Route('/sites/{id}', name: 'site_update', methods: ['PATCH'])]
@@ -154,8 +164,21 @@ final class OwnerReadController extends AbstractController
         return $this->mutate($request, $csrf, fn ($context, array $data) => $this->writes->registerRouter($context,
             is_string($data['name'] ?? null) ? $data['name'] : '', is_string($data['siteId'] ?? null) ? $data['siteId'] : '',
             is_string($data['host'] ?? null) ? $data['host'] : '', !array_key_exists('apiPort', $data) ? 8729 : (is_int($data['apiPort']) ? $data['apiPort'] : 0),
-            is_string($data['credentialReference'] ?? null) ? $data['credentialReference'] : '',
+            is_string($data['username'] ?? null) ? $data['username'] : '', is_string($data['password'] ?? null) ? $data['password'] : '',
             is_string($data['providerCode'] ?? null) ? $data['providerCode'] : 'mikrotik'), 201);
+    }
+
+    #[Route('/routers/{id}/credentials', name: 'router_credentials_replace', methods: ['PUT'])]
+    public function replaceRouterCredentials(string $id, Request $request, CsrfCookieManager $csrf): JsonResponse
+    {
+        return $this->mutate($request, $csrf, fn ($context, array $data) => $this->writes->replaceRouterCredentials($context, $id,
+            is_string($data['username'] ?? null) ? $data['username'] : '', is_string($data['password'] ?? null) ? $data['password'] : ''));
+    }
+
+    #[Route('/routers/{id}/credentials', name: 'router_credentials_revoke', methods: ['DELETE'])]
+    public function revokeRouterCredentials(string $id, Request $request, CsrfCookieManager $csrf): JsonResponse
+    {
+        return $this->mutate($request, $csrf, fn ($context) => $this->writes->revokeRouterCredentials($context, $id));
     }
 
     #[Route('/routers/{id}/status', name: 'router_status', methods: ['PATCH'])]
@@ -186,6 +209,7 @@ final class OwnerReadController extends AbstractController
         if (!$csrf->isValid($request, $data)) return $this->json(['error' => 'Invalid CSRF token.'], 403, ['Cache-Control' => 'no-store']);
         try {
             $context = $this->contexts->execute($actor->id(), $request->headers->get('X-Tenant-ID'));
+            $this->subscriptionAccess->assertMayOperate($context->tenantId);
             return $this->json($operation($context, $data), $successStatus, ['Cache-Control' => 'no-store, private']);
         } catch (OwnerTenantSelectionRequired) {
             return $this->json(['error' => 'Organization selection is required.', 'code' => 'tenant_selection_required'], 409, ['Cache-Control' => 'no-store, private']);
@@ -195,7 +219,7 @@ final class OwnerReadController extends AbstractController
             return $this->json(['error' => $exception->getMessage()], 422, ['Cache-Control' => 'no-store, private']);
         } catch (\DomainException $exception) {
             $message = $exception->getMessage();
-            $status = str_contains($message, 'Access denied') ? 403 : (str_contains($message, 'already in use') ? 409 : 404);
+            $status = str_contains($message, 'Access denied') ? 403 : (str_contains($message, 'abonnement Miksprit') ? 402 : ((str_contains($message, 'already in use') || str_contains($message, 'already has an active router') || str_contains($message, 'Suspendez le routeur')) ? 409 : 404));
             return $this->json(['error' => $status === 403 ? 'Access denied.' : $message], $status, ['Cache-Control' => 'no-store, private']);
         }
     }

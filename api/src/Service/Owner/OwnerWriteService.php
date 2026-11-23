@@ -14,9 +14,11 @@ use App\Entity\TenantPermission;
 use App\Entity\XofAmount;
 use App\Service\Router\InspectRouter;
 use App\Service\Router\RouterDriverRegistry;
+use App\Service\Router\TenantRouterCredentialSettings;
 use Doctrine\DBAL\Connection;
 use Doctrine\DBAL\Exception\UniqueConstraintViolationException;
 use Doctrine\ORM\EntityManagerInterface;
+use Symfony\Component\String\Slugger\SluggerInterface;
 
 final readonly class OwnerWriteService
 {
@@ -25,18 +27,32 @@ final readonly class OwnerWriteService
         private Connection $connection,
         private RouterDriverRegistry $routerDrivers,
         private InspectRouter $routerInspector,
+        private SluggerInterface $slugger,
+        private TenantRouterCredentialSettings $routerCredentials,
     ) {}
 
     /** @return array{id: string, name: string, slug: string, status: string} */
-    public function createSite(TenantContext $context, string $name, string $slug): array
+    public function createSite(TenantContext $context, string $name): array
     {
         $this->assert($context, TenantPermission::ManageSites);
-        if (trim($name) === '' || mb_strlen($name) > 120 || preg_match('/^[a-z0-9](?:[a-z0-9-]{0,78}[a-z0-9])?$/D', $slug) !== 1) {
-            throw new \InvalidArgumentException('Site name or slug is invalid.');
+        $name = trim($name);
+        if ($name === '' || mb_strlen($name) > 120) {
+            throw new \InvalidArgumentException('Site name is invalid.');
         }
-        if ($this->connection->fetchOne('SELECT 1 FROM sites WHERE tenant_id = ? AND slug = ?', [$context->tenantId->value, $slug])) {
-            throw new \DomainException('Site slug is already in use.');
+
+        $baseSlug = $this->slugger->slug($name)->lower()->toString();
+        $baseSlug = substr(trim($baseSlug, '-'), 0, 80);
+        if ($baseSlug === '') {
+            $baseSlug = 'site';
         }
+
+        $slug = $baseSlug;
+        $suffix = 2;
+        while ($this->connection->fetchOne('SELECT 1 FROM sites WHERE tenant_id = ? AND slug = ?', [$context->tenantId->value, $slug])) {
+            $suffixText = '-'.$suffix++;
+            $slug = rtrim(substr($baseSlug, 0, 80 - strlen($suffixText)), '-').$suffixText;
+        }
+
         $id = bin2hex(random_bytes(16));
         $site = new Site($id, $context->tenantId, $name, $slug, hash('sha256', random_bytes(32)));
         $this->entities->persist($site);
@@ -131,23 +147,45 @@ final readonly class OwnerWriteService
     }
 
     /** @return array{id: string, name: string, status: string} */
-    public function registerRouter(TenantContext $context, string $name, string $siteId, string $host, int $port, string $credentialReference, string $providerCode = 'mikrotik'): array
+    public function registerRouter(TenantContext $context, string $name, string $siteId, string $host, int $port, string $username, string $password, string $providerCode = 'mikrotik'): array
     {
         $this->assert($context, TenantPermission::ManageRouters);
         $this->assertOwned('sites', $siteId, $context);
-        $credentialReference = $this->requiredString($credentialReference, 160);
-        if (!str_starts_with($credentialReference, $context->tenantId->value.':')) {
-            throw new \InvalidArgumentException('The router credential reference must belong to the selected tenant.');
-        }
         if (!in_array($providerCode, $this->routerDrivers->codes(), true)) {
             throw new \InvalidArgumentException('The selected Wi-Fi kit is not installed.');
         }
+        $credentialReference = $context->tenantId->value.':router-'.bin2hex(random_bytes(12));
         $router = new Router(bin2hex(random_bytes(16)), $context->tenantId, $siteId,
             $this->requiredString($name, 120), trim($host), $port, $credentialReference, providerCode: $providerCode);
+        $this->routerCredentials->save($context, $credentialReference, $username, $password);
         $this->entities->persist($router);
         try { $this->entities->flush(); }
-        catch (UniqueConstraintViolationException $exception) { throw new \DomainException('Router name is already in use at this site.', previous: $exception); }
+        catch (UniqueConstraintViolationException $exception) {
+            $this->routerCredentials->revoke($context, $credentialReference);
+            throw new \DomainException('Router name is already in use at this site.', previous: $exception);
+        }
         return ['id' => $router->id, 'name' => $name, 'status' => $router->status()->value];
+    }
+
+    public function replaceRouterCredentials(TenantContext $context, string $id, string $username, string $password): array
+    {
+        $this->assert($context, TenantPermission::ManageRouters);
+        $this->assertOwned('routers', $id, $context);
+        $router = $this->entities->find(Router::class, $id);
+        if (!$router instanceof Router || !$router->tenantId()->equals($context->tenantId)) throw new \DomainException('Router not found.');
+        if ($router->status()->value === 'active') throw new \DomainException('Suspendez le routeur avant de remplacer ses identifiants, puis vérifiez-le de nouveau.');
+        $this->routerCredentials->save($context, $router->credentialReference(), $username, $password);
+        return ['id' => $id, 'credentialsConfigured' => true];
+    }
+
+    public function revokeRouterCredentials(TenantContext $context, string $id): array
+    {
+        $this->assert($context, TenantPermission::ManageRouters);
+        $this->assertOwned('routers', $id, $context);
+        $router = $this->entities->find(Router::class, $id);
+        if (!$router instanceof Router || !$router->tenantId()->equals($context->tenantId)) throw new \DomainException('Router not found.');
+        $this->routerCredentials->revoke($context, $router->credentialReference());
+        return ['id' => $id, 'credentialsConfigured' => false];
     }
 
     /** @return array{id: string, status: string} */
@@ -170,8 +208,24 @@ final readonly class OwnerWriteService
         $health = $this->routerInspector->execute($context, $id);
         $router = $this->entities->find(Router::class, $id);
         if (!$router instanceof Router || !$router->tenantId()->equals($context->tenantId)) throw new \DomainException('Router not found.');
-        $router->markReachable($health['version'], new \DateTimeImmutable());
-        $this->entities->flush();
+        $this->connection->transactional(function (Connection $connection) use ($router, $context, $health): void {
+            $platform = $connection->getDatabasePlatform();
+            $lock = $platform instanceof \Doctrine\DBAL\Platforms\AbstractMySQLPlatform
+                || $platform instanceof \Doctrine\DBAL\Platforms\PostgreSQLPlatform ? ' FOR UPDATE' : '';
+            $connection->fetchOne(
+                'SELECT id FROM sites WHERE id = ? AND tenant_id = ?'.$lock,
+                [$router->siteId, $context->tenantId->value],
+            );
+            $alreadyActive = (int) $connection->fetchOne(
+                "SELECT COUNT(*) FROM routers WHERE tenant_id = ? AND site_id = ? AND status = 'active' AND id <> ?",
+                [$context->tenantId->value, $router->siteId, $router->id],
+            );
+            if ($alreadyActive > 0) {
+                throw new \DomainException('This site already has an active router. Suspend it before activating another.');
+            }
+            $router->markReachable($health['version'], new \DateTimeImmutable());
+            $this->entities->flush();
+        });
         return ['id' => $id, 'status' => $router->status()->value, 'version' => $health['version'], 'identity' => $health['identity']];
     }
 

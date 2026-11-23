@@ -90,7 +90,7 @@ final readonly class ProcessPaidOrderOutbox
 
         try {
             $expiresAt = new \DateTimeImmutable('+'.$order->plan->sessionSeconds.' seconds');
-            $voucher->markProvisioned($envelope, $expiresAt);
+            $voucher->markProvisioned($envelope, $expiresAt, $username);
             $order->fulfill($voucher->id);
             $this->repository->complete($message, $voucher, $order);
         } catch (\Throwable) {

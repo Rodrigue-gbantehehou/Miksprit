@@ -5,12 +5,14 @@ declare(strict_types=1);
 namespace App\Repository;
 
 use Doctrine\DBAL\Connection;
+use App\Entity\TenantId;
+use App\Service\Subscription\TenantSubscriptionAccess;
 use Symfony\Component\DependencyInjection\Attribute\AsAlias;
 
 #[AsAlias(PublicSitePlanRepository::class)]
 final readonly class DoctrinePublicSitePlanRepository implements PublicSitePlanRepository
 {
-    public function __construct(private Connection $connection)
+    public function __construct(private Connection $connection, private TenantSubscriptionAccess $subscriptionAccess)
     {
     }
 
@@ -20,13 +22,15 @@ final readonly class DoctrinePublicSitePlanRepository implements PublicSitePlanR
             'SELECT s.id, s.site_name, s.tenant_id
              FROM sites s
              INNER JOIN organizations o ON o.tenant_id = s.tenant_id
-             WHERE s.id = :siteId AND s.status = :siteStatus AND o.organization_status = :organizationStatus',
-            ['siteId' => $siteId, 'siteStatus' => 'active', 'organizationStatus' => 'active'],
+             WHERE s.id = :siteId AND s.status = :siteStatus AND o.organization_status = :organizationStatus
+               AND (SELECT COUNT(*) FROM routers r WHERE r.tenant_id = s.tenant_id AND r.site_id = s.id AND r.status = :routerStatus) = 1',
+            ['siteId' => $siteId, 'siteStatus' => 'active', 'organizationStatus' => 'active', 'routerStatus' => 'active'],
         );
 
         if ($site === false) {
             return null;
         }
+        if (!$this->subscriptionAccess->mayOperate(new TenantId((string) $site['tenant_id']))) return null;
 
         $rows = $this->connection->fetchAllAssociative(
             'SELECT id, name, price_minor_units, session_seconds, data_limit_bytes, device_limit

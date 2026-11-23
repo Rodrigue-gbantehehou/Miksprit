@@ -4,46 +4,33 @@
     <meta charset="utf-8">
     <meta name="viewport" content="width=device-width, initial-scale=1">
     <meta name="theme-color" content="#0d584b">
-    <meta name="description" content="Choisissez votre forfait Wi-Fi et connectez-vous en quelques étapes.">
-    <title>Accès Wi-Fi — Miksprit</title>
+    <meta name="description" content="Choisissez votre ticket Wi-Fi.">
+    <title>Tickets Wi-Fi</title>
     <link rel="stylesheet" href="styles.css">
     <script src="app.js" defer></script>
   </head>
   <body data-api-base="">
     <header class="site-header">
-      <a class="brand" href="#main" aria-label="Miksprit, accueil">
-        <span class="brand-mark" aria-hidden="true">M</span>
-        <span>Miksprit</span>
-      </a>
-      <span class="secure-note"><span aria-hidden="true">●</span> Portail Wi-Fi sécurisé</span>
+      <div class="site-identity">
+        <span class="site-mark" aria-hidden="true"></span>
+        <strong id="site-name"></strong>
+      </div>
+      <span class="secure-note">Paiement en ligne</span>
     </header>
 
     <main id="main" class="layout">
-      <section class="intro" aria-labelledby="page-title">
-        <div class="eyebrow"><span class="signal-icon" aria-hidden="true">⌁</span> Bienvenue sur le réseau</div>
-        <h1 id="page-title">Un bon Wi-Fi,<br><span>à votre rythme.</span></h1>
-        <p class="intro-copy">Choisissez un forfait pour accéder à Internet. Le paiement et l’activation sont confirmés par le serveur.</p>
-        <div class="network-card">
-          <span class="network-icon" aria-hidden="true">◉</span>
-          <span><strong>Réseau invité</strong><small>Connexion disponible dans cet espace</small></span>
-          <span class="online-dot" aria-label="Réseau disponible"></span>
-        </div>
-        <p class="help-copy">Besoin d’aide ? Demandez les informations du réseau au personnel sur place.</p>
-      </section>
-
       <section class="plans-panel" aria-labelledby="plans-title">
         <div class="panel-heading">
           <div>
-            <p class="section-kicker">Accès Internet</p>
-            <h2 id="plans-title">Choisissez votre forfait</h2>
+            <p class="section-kicker">OFFRES DISPONIBLES</p>
+            <h1 id="plans-title">Choisissez votre ticket</h1>
           </div>
-          <span class="step-badge"><span>1</span> Choisir</span>
         </div>
 
         <div id="message" class="message" role="status" aria-live="polite" hidden></div>
         <div id="plans" class="plans-list" aria-busy="true"></div>
         <form id="checkout-form" class="checkout-form" hidden>
-          <h3>Vos informations de paiement</h3>
+          <h3>Coordonnées</h3>
           <label for="checkout-email">Adresse e-mail</label>
           <input id="checkout-email" name="email" type="email" autocomplete="email" maxlength="190" required>
           <div class="customer-name-fields">
@@ -53,13 +40,13 @@
           <button class="choose-button" type="submit">Continuer vers le paiement</button>
         </form>
         <div id="order-status" class="order-status" role="status" aria-live="polite" hidden></div>
-        <p class="terms">En continuant, vous acceptez les conditions d’utilisation du réseau Wi-Fi.</p>
+        <p class="terms">En continuant, vous acceptez les conditions du réseau Wi-Fi.</p>
       </section>
     </main>
 
     <footer class="site-footer">
       <span>Propulsé par <strong>Miksprit</strong></span>
-      <span>Paiement sécurisé · XOF</span>
+      <span>Montants en XOF</span>
     </footer>
   </body>
 </html>

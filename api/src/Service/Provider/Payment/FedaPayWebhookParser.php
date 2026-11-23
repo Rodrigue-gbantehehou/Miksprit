@@ -10,7 +10,7 @@ use App\Event\PaymentWebhookEvent;
 final class FedaPayWebhookParser
 {
     /** @throws \JsonException */
-    public static function parse(string $rawBody): PaymentWebhookEvent
+    public static function parse(string $rawBody, ?string $tenantId = null): PaymentWebhookEvent
     {
         $payload = json_decode($rawBody, true, 32, JSON_THROW_ON_ERROR);
         if (!is_array($payload)) {
@@ -28,6 +28,6 @@ final class FedaPayWebhookParser
             throw new \UnexpectedValueException('Webhook payload is missing required identifiers.');
         }
 
-        return new PaymentWebhookEvent((string) $eventId, $eventType, (string) $providerReference, 'fedapay');
+        return new PaymentWebhookEvent((string) $eventId, $eventType, (string) $providerReference, 'fedapay', $tenantId);
     }
 }

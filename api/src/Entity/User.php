@@ -29,6 +29,8 @@ class User implements UserInterface, PasswordAuthenticatedUserInterface, Equatab
         private bool $active = true,
         #[ORM\Column(name: 'created_at', type: 'datetime_immutable')]
         public readonly \DateTimeImmutable $createdAt = new \DateTimeImmutable(),
+        #[ORM\Column(name: 'password_setup_required', type: 'boolean', options: ['default' => false])]
+        private bool $passwordSetupRequired = false,
     ) {
         $this->email = self::normalizeEmail($email);
         if ($id === '' || strlen($id) > 36) {
@@ -41,9 +43,20 @@ class User implements UserInterface, PasswordAuthenticatedUserInterface, Equatab
         return new self($id, $email, $hashedPassword, $superAdmin ? ['ROLE_USER', 'ROLE_SUPER_ADMIN'] : ['ROLE_USER']);
     }
 
+    public static function invited(string $id, string $email, string $hashedPassword): self
+    {
+        return new self($id, $email, $hashedPassword, ['ROLE_USER'], true, new \DateTimeImmutable(), true);
+    }
+
     public function getUserIdentifier(): string { return $this->email; }
     public function getPassword(): ?string { return $this->password; }
-    public function setPassword(string $password): void { $this->password = $password; }
+    public function setPassword(string $password): void { $this->password = $password; $this->passwordSetupRequired = false; }
+    public function setInvitationPasswordHash(string $passwordHash): void
+    {
+        if (!$this->passwordSetupRequired) throw new \LogicException('Invitation password setup is not pending.');
+        $this->password = $passwordHash;
+    }
+    public function requiresPasswordSetup(): bool { return $this->passwordSetupRequired; }
     public function getRoles(): array { return array_values(array_unique($this->roles)); }
     public function eraseCredentials(): void {}
     public function id(): string { return $this->id; }

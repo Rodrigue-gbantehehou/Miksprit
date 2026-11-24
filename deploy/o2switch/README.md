@@ -16,12 +16,19 @@ Chaque frontend est une application Node.js indépendante gérée par **Setup No
 1. Faire pointer les quatre sous-domaines vers l’hébergement et activer leur certificat HTTPS.
 2. Cloner le dépôt dans un répertoire privé du compte, par exemple `~/apps/Miksprit`. Ne pas placer le code dans `public_html` ni dans le document root d’un domaine.
 3. Créer une application Node.js pour chaque frontend avec Node.js **22**, le mode **Production**, son dossier d’application (`landing`, `client` ou `admin`), son URL de sous-domaine à la racine et son fichier de démarrage `server.js`.
-4. Installer les dépendances dans le dossier de l’application avec `npm ci`.
+4. Entrer dans le dossier précis de l’application et installer toutes ses dépendances avec `npm ci` (ne pas utiliser `npx next`, qui peut télécharger Next seul sans React ni les alias locaux du projet).
 5. Ajouter les variables d’environnement indiquées ci-dessous dans cPanel pour l’exécution. Les exporter aussi dans la session SSH qui lance le build : les variables `NEXT_PUBLIC_*` sont compilées dans le navigateur et `API_INTERNAL_BASE` est lu lors de la création des règles Next.js.
-6. Lancer `npm run build` dans chaque dossier. Redémarrer chaque application depuis cPanel après le build.
+6. Lancer `npm run build` dans chaque dossier. Le script utilise Webpack pour éviter l’échec du binaire Turbopack/SWC sur les systèmes O2switch dont la glibc est antérieure à 2.29. Redémarrer chaque application depuis cPanel après le build.
 7. Pour les mises à jour, récupérer les changements, refaire `npm ci` si le lockfile a changé, reconstruire, puis redémarrer l’application.
 
-Les dossiers `landing`, `client` et `admin` ont chacun leur propre `package-lock.json` et `server.js`. Ne lance pas `npm install` depuis la racine du monorepo.
+Les dossiers `landing`, `client` et `admin` ont chacun leur propre `package-lock.json` et `server.js`. Exemple après s’être placé dans le dossier `landing` :
+
+```sh
+npm ci
+npm run build
+```
+
+Reprendre ces commandes séparément depuis `client` puis `admin`. Ne lance pas `npm install` depuis la racine du monorepo et ne lance pas `npx next build`.
 
 ## Variables Passenger
 

@@ -79,7 +79,19 @@ PLATFORM_SUBSCRIPTION_RETURN_URL=https://mymik.poulvia.com/abonnement
 
 `AUTH_COOKIE_DOMAIN=poulvia.com` permet aux cookies d’authentification et CSRF, `Secure`, `HttpOnly` et `SameSite=Lax`, de rester disponibles entre les sous-domaines. Ne configure pas ce domaine sur un environnement local ou partagé avec un autre produit.
 
-L’API doit répondre en HTTPS sur `https://mikapi.poulvia.com/api/v1`. Il faut aussi configurer ses secrets de production, la base de données, le mail, les clés de chiffrement et les tâches planifiées selon [`../README.md`](../README.md) et [`../../docs/deployment/operations.md`](../../docs/deployment/operations.md).
+Le document root Apache de `mikapi.poulvia.com` doit être `Miksprit/api/public`, où `.htaccess` transmet les routes inconnues à `index.php`. Apache doit autoriser les règles `.htaccess` (`AllowOverride All`) et `mod_rewrite` doit être actif. L’API doit alors répondre en HTTPS sur `https://mikapi.poulvia.com/api/v1` sans préfixe `index.php`.
+
+Les clés JWT ne sont pas versionnées. Sur le serveur, depuis `api/`, crée le répertoire si nécessaire, configure `JWT_PASSPHRASE` dans l’environnement de production, puis génère la paire une seule fois :
+
+```sh
+mkdir -p config/jwt
+php bin/console lexik:jwt:generate-keypair
+chmod 600 config/jwt/private.pem
+chmod 644 config/jwt/public.pem
+php bin/console lexik:jwt:check-config
+```
+
+Garde `private.pem` hors de Git et préserve la même paire lors des déploiements suivants. `JWT_SECRET_KEY` et `JWT_PUBLIC_KEY` doivent pointer sur ces fichiers, et `JWT_PASSPHRASE` doit être exactement celle utilisée à la génération. Il faut aussi configurer les autres secrets de production, la base de données, le mail, les clés de chiffrement et les tâches planifiées selon [`../README.md`](../README.md) et [`../../docs/deployment/operations.md`](../../docs/deployment/operations.md).
 
 ## Ordre de mise en ligne
 

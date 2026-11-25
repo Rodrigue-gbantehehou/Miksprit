@@ -9,8 +9,8 @@ import { AccountLayout } from "@/components/account-layout";
 type LoginResponse = { user: { id: string; email: string }; availableApps: Array<"client" | "admin">; defaultApp: "client" | "admin" | null };
 const apiBase = (process.env.NEXT_PUBLIC_API_BASE ?? "/api/v1").replace(/\/$/, "");
 const destinations = {
-  client: process.env.NEXT_PUBLIC_CLIENT_APP_URL ?? (process.env.NODE_ENV === "development" ? "http://localhost:3000" : ""),
-  admin: process.env.NEXT_PUBLIC_ADMIN_APP_URL ?? (process.env.NODE_ENV === "development" ? "http://localhost:3001" : ""),
+  client: process.env.NEXT_PUBLIC_CLIENT_APP_URL ?? (process.env.NODE_ENV === "development" ? "http://localhost:3000" : "https://mymik.poulvia.com"),
+  admin: process.env.NEXT_PUBLIC_ADMIN_APP_URL ?? (process.env.NODE_ENV === "development" ? "http://localhost:3001" : "https://mikhome.poulvia.com"),
 };
 
 function allowedReturnTo(value: string | null, apps: LoginResponse["availableApps"]): string | null {

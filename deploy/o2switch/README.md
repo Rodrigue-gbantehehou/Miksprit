@@ -62,7 +62,7 @@ API_INTERNAL_BASE=https://mikapi.poulvia.com
 NEXT_PUBLIC_LANDING_LOGIN_URL=https://miksprit.poulvia.com/connexion
 ```
 
-`API_INTERNAL_BASE` est utilisé dans les règles de réécriture Next.js générées pendant le build. Après sa modification, reconstruire l’application et la redémarrer. Les variables `NEXT_PUBLIC_*` sont intégrées au bundle navigateur au build. Configure les mêmes valeurs dans cPanel et dans la session SSH de compilation; ne mets aucun secret dans une variable `NEXT_PUBLIC_*`.
+`API_INTERNAL_BASE` est utilisé dans les règles de réécriture Next.js générées pendant le build. En production, son défaut est `https://mikapi.poulvia.com`; les redirections vers la connexion et les espaces utilisent aussi les domaines ci-dessus par défaut. Si tu remplaces une de ces valeurs dans cPanel, exporte-la également dans la session SSH avant `npm run build`, puis redémarre l’application. Les variables `NEXT_PUBLIC_*` sont intégrées au bundle navigateur au build. Ne mets aucun secret dans une variable `NEXT_PUBLIC_*`.
 
 ## Configuration API requise pour ces domaines
 

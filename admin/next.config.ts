@@ -1,6 +1,7 @@
 import type { NextConfig } from "next";
 
-const apiInternalBase = (process.env.API_INTERNAL_BASE ?? "http://127.0.0.1:8000").replace(/\/+$/, "");
+const defaultApiBase = process.env.NODE_ENV === "production" ? "https://mikapi.poulvia.com" : "http://127.0.0.1:8000";
+const apiInternalBase = (process.env.API_INTERNAL_BASE?.trim() || defaultApiBase).replace(/\/+$/, "");
 
 const nextConfig: NextConfig = {
   /* config options here */

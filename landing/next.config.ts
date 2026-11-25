@@ -5,7 +5,8 @@ const nextConfig: NextConfig = {
   cacheComponents: true,
   partialPrefetching: true,
   async rewrites() {
-    const apiBase = (process.env.API_INTERNAL_BASE ?? "http://127.0.0.1:8000").replace(/\/+$/, "");
+    const defaultApiBase = process.env.NODE_ENV === "production" ? "https://mikapi.poulvia.com" : "http://127.0.0.1:8000";
+    const apiBase = (process.env.API_INTERNAL_BASE?.trim() || defaultApiBase).replace(/\/+$/, "");
     return [{ source: "/api/v1/:path*", destination: `${apiBase}/api/v1/:path*` }];
   },
   turbopack: {

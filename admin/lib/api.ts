@@ -15,7 +15,7 @@ export type SubscriptionOffer = { id: string; code: string; name: string; provid
 export type PlatformSubscription = { id: string; tenantId: string; organization: string; status: string; offer: string; amountXof: number; currentPeriodEnd: string | null; nextDueAt: string | null };
 
 const API_BASE = (process.env.NEXT_PUBLIC_API_BASE ?? "/api/v1").replace(/\/$/, "");
-const LOGIN_URL = process.env.NEXT_PUBLIC_LANDING_LOGIN_URL ?? (process.env.NODE_ENV === "development" ? "http://localhost:3002/connexion" : "/connexion");
+const LOGIN_URL = process.env.NEXT_PUBLIC_LANDING_LOGIN_URL ?? (process.env.NODE_ENV === "development" ? "http://localhost:3002/connexion" : "https://miksprit.poulvia.com/connexion");
 
 let refreshTimer: number | null = null;
 let refreshInFlight: Promise<boolean> | null = null;

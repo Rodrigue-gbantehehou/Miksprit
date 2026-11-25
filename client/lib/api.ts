@@ -28,7 +28,7 @@ export type OwnerSubscriptionSummary = { subscription: { billingEnabled: boolean
 export type PaymentSettings = { availableProviders: { code: string }[]; providerEnabled: boolean; configuration: { provider: string | null; environment: string | null; configured: boolean; lastApiCheckAt: string | null; updatedAt: string | null } };
 
 const API_BASE = (process.env.NEXT_PUBLIC_API_BASE ?? "/api/v1").replace(/\/$/, "");
-const LOGIN_URL = process.env.NEXT_PUBLIC_LANDING_LOGIN_URL ?? (process.env.NODE_ENV === "development" ? "http://localhost:3002/connexion" : "/connexion");
+const LOGIN_URL = process.env.NEXT_PUBLIC_LANDING_LOGIN_URL ?? (process.env.NODE_ENV === "development" ? "http://localhost:3002/connexion" : "https://miksprit.poulvia.com/connexion");
 let selectedTenantId: string | null = null;
 
 export function setOwnerTenant(tenantId: string | null): void {

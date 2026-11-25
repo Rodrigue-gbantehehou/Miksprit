@@ -70,12 +70,15 @@ L’API Symfony n’est pas une application Node.js Passenger. Elle doit être d
 
 ```dotenv
 APP_ENV=prod
+APP_SECRET=<secret aléatoire stable d’au moins 32 octets>
 DEFAULT_URI=https://mikapi.poulvia.com
 AUTH_PUBLIC_BASE_URL=https://miksprit.poulvia.com
 AUTH_COOKIE_DOMAIN=poulvia.com
 PAYMENT_RETURN_URL=https://mymik.poulvia.com/portal
 PLATFORM_SUBSCRIPTION_RETURN_URL=https://mymik.poulvia.com/abonnement
 ```
+
+Générer `APP_SECRET` une seule fois avec `php -r 'echo bin2hex(random_bytes(32)), PHP_EOL;'`, puis enregistrer la valeur dans l’environnement de production de l’application PHP (pas dans Git). `RefreshSessionStore`, utilisé lors de la connexion, exige au moins 32 octets ; la valeur de développement dans `.env` ne convient pas à la production. Conserver la même valeur lors des déploiements suivants.
 
 `AUTH_COOKIE_DOMAIN=poulvia.com` permet aux cookies d’authentification et CSRF, `Secure`, `HttpOnly` et `SameSite=Lax`, de rester disponibles entre les sous-domaines. Ne configure pas ce domaine sur un environnement local ou partagé avec un autre produit.
 

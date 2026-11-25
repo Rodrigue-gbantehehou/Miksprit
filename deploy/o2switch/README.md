@@ -80,7 +80,7 @@ PLATFORM_SUBSCRIPTION_RETURN_URL=https://mymik.poulvia.com/abonnement
 
 Générer `APP_SECRET` une seule fois avec `php -r 'echo bin2hex(random_bytes(32)), PHP_EOL;'`, puis enregistrer la valeur dans l’environnement de production de l’application PHP (pas dans Git). `RefreshSessionStore`, utilisé lors de la connexion, exige au moins 32 octets ; la valeur de développement dans `.env` ne convient pas à la production. Conserver la même valeur lors des déploiements suivants.
 
-`AUTH_COOKIE_DOMAIN=poulvia.com` permet aux cookies d’authentification et CSRF, `Secure`, `HttpOnly` et `SameSite=Lax`, de rester disponibles entre les sous-domaines. Ne configure pas ce domaine sur un environnement local ou partagé avec un autre produit.
+En production, `AUTH_COOKIE_DOMAIN` prend par défaut la valeur `poulvia.com` dans `config/packages/prod/services.yaml`. Cela permet aux cookies d’authentification et CSRF, `Secure`, `HttpOnly` et `SameSite=Lax`, de rester disponibles entre les sous-domaines. La variable d’environnement peut remplacer cette valeur si le domaine de déploiement change. Ne configure pas ce domaine sur un environnement local ou partagé avec un autre produit.
 
 Le document root Apache de `mikapi.poulvia.com` doit être `Miksprit/api/public`, où `.htaccess` transmet les routes inconnues à `index.php`. Apache doit autoriser les règles `.htaccess` (`AllowOverride All`) et `mod_rewrite` doit être actif. L’API doit alors répondre en HTTPS sur `https://mikapi.poulvia.com/api/v1` sans préfixe `index.php`.
 

@@ -1,0 +1,3 @@
+parameters:
+    # Share authentication and CSRF cookies across the Miksprit subdomains.
+    auth_cookie_domain: 'poulvia.com'

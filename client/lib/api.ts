@@ -99,9 +99,14 @@ async function get<T>(path: string, signal?: AbortSignal): Promise<T> {
     throw new Error("Votre session a expiré.");
   }
   if (!response.ok) {
-    throw new Error(response.status === 403
-      ? "Accès refusé."
-      : `Erreur ${response.status}.`);
+    const result = await response.json().catch(() => ({})) as { error?: string; code?: string };
+    if (result.code === "owner_tenant_unavailable") {
+      throw new Error("Aucun espace actif n’est associé à ce compte. Créez votre espace Miksprit ou vérifiez votre organisation.");
+    }
+    if (response.status === 403 && result.error === "Access denied.") {
+      throw new Error("Votre rôle dans cette organisation ne permet pas cette action.");
+    }
+    throw new Error(result.error ?? `Erreur ${response.status}.`);
   }
   return response.json() as Promise<T>;
 }

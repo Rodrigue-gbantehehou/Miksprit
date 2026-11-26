@@ -3,7 +3,7 @@
 import { useCallback, useEffect, useRef, useState } from "react";
 import type { ReactNode } from "react";
 import { RefreshCw } from "lucide-react";
-import { api, type ApiResult, type AdminUser, type AuditEvent, type LedgerEntry, type OperationalStatus, type Payment, type PlatformSummary, type PlatformSubscription, type Router, type SubscriptionOffer, type Tenant } from "@/lib/api";
+import { api, CENTRAL_LOGIN_URL, type ApiResult, type AdminUser, type AuditEvent, type LedgerEntry, type OperationalStatus, type Payment, type PlatformSummary, type PlatformSubscription, type Router, type SubscriptionOffer, type Tenant } from "@/lib/api";
 import { Badge as UiBadge } from "@/components/ui/badge";
 import { Button } from "@/components/ui/button";
 import { Card, CardContent, CardDescription, CardHeader, CardTitle } from "@/components/ui/card";
@@ -44,8 +44,7 @@ export default function GlobalAdmin() {
     setLogoutError("");
     try {
       await api.logout();
-      const loginUrl = process.env.NEXT_PUBLIC_LANDING_LOGIN_URL ?? (process.env.NODE_ENV === "development" ? "http://localhost:3002/connexion" : "/connexion");
-      window.location.assign(new URL(loginUrl, window.location.origin).toString());
+      window.location.assign(new URL(CENTRAL_LOGIN_URL, window.location.origin).toString());
     } catch (cause) {
       setLogoutError(cause instanceof Error ? cause.message : "Déconnexion impossible.");
     }

@@ -1,7 +1,7 @@
 "use client";
 
 import { useCallback, useEffect, useId, useRef, useState } from "react";
-import { api, setOwnerTenant, type ApiResult, type DashboardSummary, type OwnerHotspotSession, type OwnerMember, type OwnerOrganization, type OwnerSubscriptionSummary, type PaymentSettings, type Plan, type Router, type RouterDriver, type Site, type Transaction } from "@/lib/api";
+import { api, CENTRAL_LOGIN_URL, setOwnerTenant, type ApiResult, type DashboardSummary, type OwnerHotspotSession, type OwnerMember, type OwnerOrganization, type OwnerSubscriptionSummary, type PaymentSettings, type Plan, type Router, type RouterDriver, type Site, type Transaction } from "@/lib/api";
 
 const SITE_SLUG_PATTERN = "[a-z0-9]([a-z0-9\\x2d]{0,78}[a-z0-9])?";
 import { Badge as UiBadge } from "@/components/ui/badge";
@@ -180,8 +180,7 @@ export default function Home() {
     setLogoutError("");
     try {
       await api.logout();
-      const loginUrl = process.env.NEXT_PUBLIC_LANDING_LOGIN_URL ?? (process.env.NODE_ENV === "development" ? "http://localhost:3002/connexion" : "/connexion");
-      window.location.assign(new URL(loginUrl, window.location.origin).toString());
+      window.location.assign(new URL(CENTRAL_LOGIN_URL, window.location.origin).toString());
     } catch (cause) {
       setLogoutError(cause instanceof Error ? cause.message : "Déconnexion impossible.");
     }

@@ -15,7 +15,9 @@ export type SubscriptionOffer = { id: string; code: string; name: string; provid
 export type PlatformSubscription = { id: string; tenantId: string; organization: string; status: string; offer: string; amountXof: number; currentPeriodEnd: string | null; nextDueAt: string | null };
 
 const API_BASE = (process.env.NEXT_PUBLIC_API_BASE ?? "/api/v1").replace(/\/$/, "");
-const LOGIN_URL = process.env.NEXT_PUBLIC_LANDING_LOGIN_URL ?? (process.env.NODE_ENV === "development" ? "http://localhost:3002/connexion" : "https://miksprit.poulvia.com/connexion");
+const DEFAULT_CENTRAL_LOGIN_URL = process.env.NODE_ENV === "development" ? "http://localhost:3002/connexion" : "https://miksprit.poulvia.com/connexion";
+const configuredLoginUrl = process.env.NEXT_PUBLIC_LANDING_LOGIN_URL?.trim();
+export const CENTRAL_LOGIN_URL = configuredLoginUrl && /^https?:\/\//i.test(configuredLoginUrl) ? configuredLoginUrl : DEFAULT_CENTRAL_LOGIN_URL;
 
 let refreshTimer: number | null = null;
 let refreshInFlight: Promise<boolean> | null = null;
@@ -53,7 +55,7 @@ function scheduleSessionRefresh(): void {
 function redirectToCentralLogin(): void {
   if (typeof window === "undefined") return;
 
-  const login = new URL(LOGIN_URL, window.location.origin);
+  const login = new URL(CENTRAL_LOGIN_URL, window.location.origin);
   login.searchParams.set("returnTo", `${window.location.origin}${window.location.pathname}`);
   window.location.assign(login.toString());
 }

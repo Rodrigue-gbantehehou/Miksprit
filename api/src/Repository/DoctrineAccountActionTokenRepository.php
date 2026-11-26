@@ -6,6 +6,7 @@ namespace App\Repository;
 
 use App\Entity\AccountActionToken;
 use App\Entity\AccountLinkPurpose;
+use Doctrine\DBAL\LockMode;
 use Doctrine\ORM\EntityManagerInterface;
 use Symfony\Component\DependencyInjection\Attribute\AsAlias;
 
@@ -41,7 +42,7 @@ final readonly class DoctrineAccountActionTokenRepository implements AccountActi
     public function consumeAtomically(AccountActionToken $token, \DateTimeImmutable $now, callable $operation): bool
     {
         return $this->entityManager->wrapInTransaction(function () use ($token, $now, $operation): bool {
-            $managed = $this->entityManager->find(AccountActionToken::class, $token->id, \Doctrine\ORM\LockMode::PESSIMISTIC_WRITE);
+            $managed = $this->entityManager->find(AccountActionToken::class, $token->id, LockMode::PESSIMISTIC_WRITE);
             if (!$managed instanceof AccountActionToken || !$managed->isUsable($now)) {
                 return false;
             }

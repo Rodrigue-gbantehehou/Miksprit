@@ -27,6 +27,12 @@ final readonly class AccountLinkIssuer
         $this->issue($user, AccountLinkPurpose::PasswordReset);
     }
 
+    public function sendEmailVerification(User $user): void
+    {
+        if ($user->emailVerifiedAt() !== null) return;
+        $this->issue($user, AccountLinkPurpose::EmailVerification);
+    }
+
     public function sendInvitation(User $user): void
     {
         $this->issue($user, AccountLinkPurpose::Invitation);
@@ -41,7 +47,11 @@ final readonly class AccountLinkIssuer
     {
         $now = new \DateTimeImmutable();
         $rawToken = rtrim(strtr(base64_encode(random_bytes(32)), '+/', '-_'), '=');
-        $ttl = $purpose === AccountLinkPurpose::Invitation ? new \DateInterval('P3D') : new \DateInterval('PT1H');
+        $ttl = match ($purpose) {
+            AccountLinkPurpose::Invitation => new \DateInterval('P3D'),
+            AccountLinkPurpose::EmailVerification => new \DateInterval('P1D'),
+            AccountLinkPurpose::PasswordReset => new \DateInterval('PT1H'),
+        };
         $this->tokens->invalidateOutstanding($user->id(), $purpose, $now);
         $this->tokens->save(AccountActionToken::issue(
             bin2hex(random_bytes(16)),
@@ -51,9 +61,17 @@ final readonly class AccountLinkIssuer
             $now->add($ttl),
         ));
 
-        $url = $this->baseUrl.'/reinitialiser?'.http_build_query(['purpose' => $purpose->value, 'token' => $rawToken], '', '&', PHP_QUERY_RFC3986);
-        $subject = $purpose === AccountLinkPurpose::Invitation ? 'Votre accès Miksprit' : 'Réinitialisation de votre mot de passe Miksprit';
-        $expiry = $purpose === AccountLinkPurpose::Invitation ? '3 jours' : '1 heure';
-        $this->email->send($user->email(), $subject, "Pour continuer, ouvrez ce lien sécurisé (valable {$expiry}) :\n\n{$url}\n\nSi vous n'avez pas demandé cette action, ignorez ce message.");
+        if ($purpose === AccountLinkPurpose::EmailVerification) {
+            $url = $this->baseUrl.'/verifier-compte?'.http_build_query(['token' => $rawToken], '', '&', PHP_QUERY_RFC3986);
+            $subject = 'Confirmez votre adresse e-mail Miksprit';
+            $expiry = '24 heures';
+            $instruction = 'Votre compte est déjà utilisable. Confirmez votre adresse à l’aide de ce lien sécurisé';
+        } else {
+            $url = $this->baseUrl.'/reinitialiser?'.http_build_query(['purpose' => $purpose->value, 'token' => $rawToken], '', '&', PHP_QUERY_RFC3986);
+            $subject = $purpose === AccountLinkPurpose::Invitation ? 'Votre accès Miksprit' : 'Réinitialisation de votre mot de passe Miksprit';
+            $expiry = $purpose === AccountLinkPurpose::Invitation ? '3 jours' : '1 heure';
+            $instruction = 'Pour continuer, ouvrez ce lien sécurisé';
+        }
+        $this->email->send($user->email(), $subject, "{$instruction} (valable {$expiry}) :\n\n{$url}\n\nSi vous n'avez pas demandé cette action, ignorez ce message.");
     }
 }

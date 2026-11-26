@@ -31,6 +31,8 @@ class User implements UserInterface, PasswordAuthenticatedUserInterface, Equatab
         public readonly \DateTimeImmutable $createdAt = new \DateTimeImmutable(),
         #[ORM\Column(name: 'password_setup_required', type: 'boolean', options: ['default' => false])]
         private bool $passwordSetupRequired = false,
+        #[ORM\Column(name: 'email_verified_at', type: 'datetime_immutable', nullable: true)]
+        private ?\DateTimeImmutable $emailVerifiedAt = null,
     ) {
         $this->email = self::normalizeEmail($email);
         if ($id === '' || strlen($id) > 36) {
@@ -57,6 +59,8 @@ class User implements UserInterface, PasswordAuthenticatedUserInterface, Equatab
         $this->password = $passwordHash;
     }
     public function requiresPasswordSetup(): bool { return $this->passwordSetupRequired; }
+    public function emailVerifiedAt(): ?\DateTimeImmutable { return $this->emailVerifiedAt; }
+    public function markEmailVerified(?\DateTimeImmutable $at = null): void { $this->emailVerifiedAt ??= $at ?? new \DateTimeImmutable(); }
     public function getRoles(): array { return array_values(array_unique($this->roles)); }
     public function eraseCredentials(): void {}
     public function id(): string { return $this->id; }

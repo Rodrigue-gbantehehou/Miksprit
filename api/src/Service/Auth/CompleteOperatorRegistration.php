@@ -43,6 +43,7 @@ final readonly class CompleteOperatorRegistration
                         throw new \DomainException('Registration details are no longer available.');
                     }
                     $user = User::create(bin2hex(random_bytes(16)), $pending->email, $pending->passwordHash);
+                    $user->markEmailVerified();
                     $tenantId = new TenantId(bin2hex(random_bytes(16)));
                     $organization = Organization::create($tenantId, $pending->organizationName, $pending->organizationSlug);
                     $membership = Membership::owner(bin2hex(random_bytes(16)), $tenantId, $user->id());

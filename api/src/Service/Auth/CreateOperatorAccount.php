@@ -10,7 +10,7 @@ use Doctrine\DBAL\Exception\UniqueConstraintViolationException;
 use Doctrine\ORM\EntityManagerInterface;
 use Symfony\Component\PasswordHasher\Hasher\UserPasswordHasherInterface;
 
-/** Creates an active login, organization and owner membership in one transaction. */
+/** Creates an active operator login before email confirmation. */
 final readonly class CreateOperatorAccount
 {
     public function __construct(
@@ -20,8 +20,7 @@ final readonly class CreateOperatorAccount
     ) {
     }
 
-    /** @return array{userId:string} */
-    public function execute(string $email, string $plainPassword): array
+    public function execute(string $email, string $plainPassword): User
     {
         $email = mb_strtolower(trim($email));
         if (filter_var($email, FILTER_VALIDATE_EMAIL) === false || strlen($email) > 190
@@ -44,6 +43,6 @@ final readonly class CreateOperatorAccount
             throw new OperatorRegistrationConflict('The email is already in use.', previous: $exception);
         }
 
-        return ['userId' => $user->id()];
+        return $user;
     }
 }

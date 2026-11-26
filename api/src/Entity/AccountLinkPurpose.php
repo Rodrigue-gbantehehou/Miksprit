@@ -8,4 +8,5 @@ enum AccountLinkPurpose: string
 {
     case PasswordReset = 'password_reset';
     case Invitation = 'invitation';
+    case EmailVerification = 'email_verification';
 }

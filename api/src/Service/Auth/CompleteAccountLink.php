@@ -23,7 +23,8 @@ final readonly class CompleteAccountLink
     public function complete(string $rawToken, string $rawPurpose, string $plainPassword): bool
     {
         $purpose = AccountLinkPurpose::tryFrom($rawPurpose);
-        if ($purpose === null || preg_match('/^[A-Za-z0-9_-]{43}$/D', $rawToken) !== 1) {
+        if (!in_array($purpose, [AccountLinkPurpose::PasswordReset, AccountLinkPurpose::Invitation], true)
+            || preg_match('/^[A-Za-z0-9_-]{43}$/D', $rawToken) !== 1) {
             return false;
         }
         $now = new \DateTimeImmutable();
@@ -39,10 +40,13 @@ final readonly class CompleteAccountLink
         $completed = $this->tokens->consumeAtomically($token, $now, function () use ($user, $plainPassword, $purpose): void {
             if ($purpose === AccountLinkPurpose::PasswordReset || $user->requiresPasswordSetup()) {
                 $user->setPassword($this->hasher->hashPassword($user, $plainPassword));
-                $this->users->save($user);
             }
             if ($purpose === AccountLinkPurpose::Invitation) {
                 $this->memberships->acceptInvitationsForActor($user->id());
+            }
+            if ($purpose === AccountLinkPurpose::PasswordReset || $purpose === AccountLinkPurpose::Invitation) {
+                $user->markEmailVerified();
+                $this->users->save($user);
             }
         });
         if ($completed && $purpose === AccountLinkPurpose::PasswordReset) $this->refreshSessions->revokeUser($user->id());

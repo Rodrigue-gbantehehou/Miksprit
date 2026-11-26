@@ -15,17 +15,17 @@ final class AccountActionToken
     private function __construct(
         #[ORM\Id]
         #[ORM\Column(type: 'string', length: 36)]
-        public readonly string $id,
+        private string $id,
         #[ORM\Column(name: 'user_id', type: 'string', length: 36)]
-        public readonly string $userId,
+        private string $userId,
         #[ORM\Column(name: 'token_hash', type: 'string', length: 64)]
-        public readonly string $tokenHash,
+        private string $tokenHash,
         #[ORM\Column(enumType: AccountLinkPurpose::class, length: 24)]
-        public readonly AccountLinkPurpose $purpose,
+        private AccountLinkPurpose $purpose,
         #[ORM\Column(name: 'expires_at', type: 'datetime_immutable')]
-        public readonly \DateTimeImmutable $expiresAt,
+        private \DateTimeImmutable $expiresAt,
         #[ORM\Column(name: 'created_at', type: 'datetime_immutable')]
-        public readonly \DateTimeImmutable $createdAt,
+        private \DateTimeImmutable $createdAt,
         #[ORM\Column(name: 'consumed_at', type: 'datetime_immutable', nullable: true)]
         private ?\DateTimeImmutable $consumedAt = null,
     ) {
@@ -45,6 +45,10 @@ final class AccountActionToken
     {
         return $this->consumedAt === null && $this->expiresAt > $now;
     }
+
+    public function id(): string { return $this->id; }
+
+    public function userId(): string { return $this->userId; }
 
     public function consume(\DateTimeImmutable $now): void
     {

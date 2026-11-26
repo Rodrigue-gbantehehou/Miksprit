@@ -32,7 +32,7 @@ final readonly class CompleteAccountLink
         if ($token === null) {
             return false;
         }
-        $user = $this->users->findById($token->userId);
+        $user = $this->users->findById($token->userId());
         if ($user === null || !$user->isActive()) {
             return false;
         }

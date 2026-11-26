@@ -23,7 +23,7 @@ final readonly class VerifyOperatorEmail
         $now = new \DateTimeImmutable();
         $token = $this->tokens->findUsable(hash('sha256', $rawToken), AccountLinkPurpose::EmailVerification, $now);
         if ($token === null) return false;
-        $user = $this->users->findById($token->userId);
+        $user = $this->users->findById($token->userId());
         if ($user === null || !$user->isActive()) return false;
 
         return $this->tokens->consumeAtomically($token, $now, function () use ($user, $now): void {

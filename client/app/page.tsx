@@ -43,6 +43,13 @@ function money(amount: number) {
   return new Intl.NumberFormat("fr-FR", { maximumFractionDigits: 0 }).format(amount) + " XOF";
 }
 
+function organizationSlugFromName(name: string): string {
+  if (name.trim() === "") return "";
+  const slug = name.normalize("NFD").replace(/[\u0300-\u036f]/g, "").toLowerCase()
+    .replace(/[^a-z0-9]+/g, "-").replace(/^-+|-+$/g, "").slice(0, 80).replace(/-+$/g, "");
+  return slug || "mon-espace";
+}
+
 function orgsRole(result: ApiResult<OwnerOrganization[]>, tenantId: string): string | null {
   return result.state === "connected" ? result.data.find((organization) => organization.id === tenantId)?.role ?? null : null;
 }
@@ -188,7 +195,7 @@ export default function Home() {
 
   return (
     <div className="app-shell">
-      <aside className={`sidebar ${sidebarCollapsed ? "is-collapsed" : ""}`}>
+      {!needsWorkspace && <aside className={`sidebar ${sidebarCollapsed ? "is-collapsed" : ""}`}>
         <Button className="sidebar-toggle" variant="outline" size="icon" type="button" onClick={toggleSidebar} aria-label={sidebarCollapsed ? "Déployer la barre latérale" : "Rétracter la barre latérale"} aria-expanded={!sidebarCollapsed} aria-controls="owner-navigation" title={sidebarCollapsed ? "Déployer la barre latérale" : "Rétracter la barre latérale"}>
           {sidebarCollapsed ? <ChevronRight size={16} aria-hidden /> : <ChevronLeft size={16} aria-hidden />}
         </Button>
@@ -199,19 +206,19 @@ export default function Home() {
           <NavigationLinks items={visibleNavigation} current={section} collapsed={sidebarCollapsed} onSelect={selectSection} />
         </nav>}
         <div className="sidebar-bottom"><OwnerProfile /></div>
-      </aside>
+      </aside>}
       <MobileNavigation open={mobileMenuOpen} onClose={closeMobileMenu} current={section} items={visibleNavigation} onSelect={selectSection} showNavigation={!needsWorkspace} />
 
-      <main className={`main-area ${sidebarCollapsed ? "is-collapsed" : ""}`} id="home" inert={mobileMenuOpen}>
+      <main className={`main-area ${needsWorkspace ? "is-onboarding" : sidebarCollapsed ? "is-collapsed" : ""}`} id="home" inert={mobileMenuOpen}>
         <header className="topbar">
-          <div className="topbar-start">{!needsWorkspace && <MobileMenuButton open={mobileMenuOpen} onOpen={openMobileMenu} />}<div className="breadcrumbs"><span>Espace propriétaire</span><span className="crumb-sep">/</span><strong>{needsWorkspace ? "Créer mon espace" : current.title}</strong></div></div>
+          {needsWorkspace ? <BrandLink onClick={() => selectSection("dashboard")} /> : <div className="topbar-start"><MobileMenuButton open={mobileMenuOpen} onOpen={openMobileMenu} /><div className="breadcrumbs"><span>Espace propriétaire</span><span className="crumb-sep">/</span><strong>{current.title}</strong></div></div>}
           <div className="top-actions"><Button variant="outline" size="sm" type="button" onClick={() => void logout()}>Déconnexion</Button></div>
         </header>
 
-        <div className="content">
+        <div className={`content ${needsWorkspace ? "onboarding-content" : ""}`}>
           {logoutError && <p role="alert">{logoutError}</p>}
           {needsWorkspace ? <>
-            <section className="page-heading"><div><h1>Créer mon espace Miksprit</h1><p>Nommez votre activité pour commencer.</p></div><Button onClick={() => void reload()} disabled={loading}>Actualiser</Button></section>
+            <section className="page-heading onboarding-heading"><div><h1>Créer mon espace Miksprit</h1><p>Commencez par nommer votre organisation. Vous pourrez ajouter votre premier site Wi-Fi juste après.</p></div></section>
             <CreateWorkspaceView onCreated={reload} />
           </> : workspaceLookupFailed ? <>
             <section className="page-heading"><div><h1>Espace indisponible</h1><p>Vérifiez votre connexion puis réessayez.</p></div><Button onClick={() => void reload()} disabled={loading}>{loading ? "Vérification…" : "Réessayer"}</Button></section>
@@ -337,6 +344,9 @@ function MobileNavigation({ open, onClose, current, items, onSelect, showNavigat
 function CreateWorkspaceView({ onCreated }: { onCreated: () => Promise<void> }) {
   const [busy, setBusy] = useState(false);
   const [error, setError] = useState("");
+  const [name, setName] = useState("");
+  const [slug, setSlug] = useState("");
+  const [slugEdited, setSlugEdited] = useState(false);
 
   async function create(event: React.FormEvent<HTMLFormElement>) {
     event.preventDefault();
@@ -354,11 +364,32 @@ function CreateWorkspaceView({ onCreated }: { onCreated: () => Promise<void> }) 
     }
   }
 
-  return <CreatePanel initiallyOpen title="Votre espace propriétaire" description="Vous en serez propriétaire." error={error} onSubmit={(event) => void create(event)}>
-    <label>Nom de l’activité<input name="name" placeholder="Ex. Café du Centre" maxLength={160} required /></label>
-    <label>Identifiant de l’espace<input name="slug" placeholder="identifiant-de-votre-espace" pattern={SITE_SLUG_PATTERN} maxLength={80} required /></label>
-    <Button type="submit" disabled={busy}>{busy ? "Création…" : "Créer mon espace"}</Button>
-  </CreatePanel>;
+  return <Card className="workspace-create-card">
+    <CardHeader className="workspace-create-header">
+      <CardTitle>Votre organisation</CardTitle>
+      <CardDescription>Choisissez le nom qui apparaîtra dans votre espace propriétaire.</CardDescription>
+    </CardHeader>
+    <CardContent className="workspace-create-content">
+      <form className="workspace-create-form" onSubmit={(event) => void create(event)}>
+        <label htmlFor="organization-name">Nom de l’organisation
+          <input id="organization-name" name="name" autoComplete="organization" placeholder="Ex. Café du Centre" maxLength={160} value={name} onChange={(event) => {
+            const nextName = event.currentTarget.value;
+            setName(nextName);
+            if (!slugEdited) setSlug(organizationSlugFromName(nextName));
+          }} required />
+        </label>
+        <label htmlFor="organization-slug">Identifiant de l’espace
+          <input id="organization-slug" name="slug" aria-describedby="organization-slug-hint" placeholder="cafe-du-centre" pattern={SITE_SLUG_PATTERN} maxLength={80} value={slug} onChange={(event) => {
+            setSlugEdited(true);
+            setSlug(event.currentTarget.value.toLowerCase());
+          }} required />
+        </label>
+        <p id="organization-slug-hint" className="workspace-create-hint">Prérempli à partir du nom. Modifiez-le uniquement si cet identifiant est déjà utilisé.</p>
+        {error && <p role="alert" className="form-error">{error}</p>}
+        <Button type="submit" disabled={busy || name.trim() === "" || slug.trim() === ""}>{busy ? "Création…" : "Créer mon espace"}</Button>
+      </form>
+    </CardContent>
+  </Card>;
 }
 
 function DashboardView({ result, reload }: { result: ApiResult<DashboardSummary>; reload: () => void }) {

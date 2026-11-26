@@ -235,6 +235,33 @@ table { width: 100%; border-collapse: collapse; text-align: left; }
 @media (prefers-reduced-motion: reduce) {
   .mobile-drawer { transition: none; }
 }
+
+.main-area.is-onboarding { margin-left: 0; }
+.onboarding-content { max-width: 1000px; padding-top: 60px; }
+.onboarding-heading { max-width: 760px; margin: 0 auto 28px; }
+.onboarding-heading h1 { font-size: clamp(28px, 3vw, 36px); letter-spacing: -1px; }
+.onboarding-heading p:not(.overline) { max-width: 620px; font-size: 14px; line-height: 1.6; }
+.workspace-create-card { max-width: 760px; margin: 0 auto; border-radius: 6px; }
+.workspace-create-header { padding: 24px 26px 18px; }
+.workspace-create-header h3 { color: #263c33; font-size: 16px; }
+.workspace-create-header p { margin-top: 6px; line-height: 1.5; }
+.workspace-create-content { padding: 0 26px 26px; }
+.workspace-create-form { display: grid; gap: 16px; }
+.workspace-create-form > label { display: grid; gap: 7px; color: #344840; font-size: 13px; font-weight: 600; }
+.workspace-create-form input { width: 100%; min-width: 0; min-height: 46px; padding: 0 12px; color: #263c33; background: #fff; border: 1px solid var(--line); border-radius: 5px; font: inherit; font-size: 14px; }
+.workspace-create-form input:focus-visible { outline: 3px solid #ea8b3b44; border-color: var(--ring); }
+.workspace-create-hint { margin: -9px 0 0; color: #64736b; font-size: 12px; line-height: 1.5; }
+.workspace-create-form > .button { justify-self: start; min-width: 190px; min-height: 44px; margin-top: 4px; }
+
+@media (max-width: 720px) {
+  .onboarding-content { padding: 42px 16px 24px; }
+  .onboarding-heading { margin-bottom: 22px; }
+  .topbar > .brand { padding: 0; }
+  .workspace-create-header { padding: 20px 18px 14px; }
+  .workspace-create-content { padding: 0 18px 20px; }
+  .workspace-create-form { gap: 14px; }
+  .workspace-create-form > .button { width: 100%; }
+}
 @media (max-width: 720px) {
   .content { padding: 16px 16px 18px; }
   .page-heading { display: grid; align-items: start; gap: 12px; margin-bottom: 18px; }

@@ -82,6 +82,8 @@ Générer `APP_SECRET` une seule fois avec `php -r 'echo bin2hex(random_bytes(32
 
 En production, `AUTH_COOKIE_DOMAIN` prend par défaut la valeur `poulvia.com` dans `config/packages/prod/services.yaml`. Cela permet aux cookies d’authentification et CSRF, `Secure`, `HttpOnly` et `SameSite=Lax`, de rester disponibles entre les sous-domaines. La variable d’environnement peut remplacer cette valeur si le domaine de déploiement change. Ne configure pas ce domaine sur un environnement local ou partagé avec un autre produit.
 
+Le fichier `api/.env.prod` définit `AUTH_PUBLIC_BASE_URL=https://miksprit.poulvia.com` pour que les liens de confirmation, d’invitation et de réinitialisation pointent vers la vitrine en production. Une variable `AUTH_PUBLIC_BASE_URL` définie dans cPanel garde la priorité sur cette valeur.
+
 Le document root Apache de `mikapi.poulvia.com` doit être `Miksprit/api/public`, où `.htaccess` transmet les routes inconnues à `index.php`. Apache doit autoriser les règles `.htaccess` (`AllowOverride All`) et `mod_rewrite` doit être actif. L’API doit alors répondre en HTTPS sur `https://mikapi.poulvia.com/api/v1` sans préfixe `index.php`.
 
 Les clés JWT ne sont pas versionnées. Sur le serveur, depuis `api/`, crée le répertoire si nécessaire, configure `JWT_PASSPHRASE` dans l’environnement de production, puis génère la paire une seule fois :

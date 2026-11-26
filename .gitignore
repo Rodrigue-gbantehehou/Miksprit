@@ -13,6 +13,7 @@
 **/.env
 **/.env.*
 !**/.env.example
+!api/.env.prod
 api/.env.dev
 api/config/jwt/*.pem
 *.key

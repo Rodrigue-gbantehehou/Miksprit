@@ -47,7 +47,7 @@ export function AccountLinkForm({ mode, invitation = false }: Props) {
   const title = mode === "request" ? "Réinitialiser le mot de passe" : invitation ? "Créer votre accès" : "Choisir un nouveau mot de passe";
   const description = mode === "request" ? "Nous enverrons un lien si l’adresse correspond à un compte." : "12 caractères minimum.";
 
-  return <AccountLayout action={<Link className="account-nav-link" href="/connexion">Connexion</Link>}>
+  return <AccountLayout headline="Vos ventes Wi-Fi, en un seul espace." fullScreen>
     <h1 className="account-title">{title}</h1>
     <p className="account-description">{description}</p>
     <Card className="login-card account-form-card"><CardContent>
@@ -65,6 +65,7 @@ export function AccountLinkForm({ mode, invitation = false }: Props) {
         <Button className="login-submit" type="submit" disabled={busy || success}>{busy ? "Traitement…" : mode === "request" ? "Envoyer le lien" : "Enregistrer"}</Button>
         {message && <p className={success ? "form-message account-success" : "form-message"} role="status" aria-live="polite">{message}</p>}
       </form>
+      <p className="account-form-note"><Link href="/connexion">Retour à la connexion</Link></p>
     </CardContent></Card>
   </AccountLayout>;
 }

@@ -37,7 +37,10 @@ export function AccountLinkForm({ mode, invitation = false }: Props) {
         if (password !== String(form.get("confirmation") ?? "")) throw new Error("Les deux mots de passe ne correspondent pas.");
         const response = await fetch(`${apiBase}/auth/password/reset`, { method: "POST", credentials: "same-origin", cache: "no-store", headers: { Accept: "application/json", "Content-Type": "application/json" }, body: JSON.stringify({ token: params.get("token"), purpose: params.get("purpose"), password, _csrf_token: csrf }) });
         const result = await response.json().catch(() => ({})) as { message?: string; error?: string };
-        if (!response.ok) throw new Error(result.error ?? "Lien invalide ou expiré. Demandez-en un nouveau.");
+        if (!response.ok) {
+          if (response.status >= 500) throw new Error("Le service rencontre un problème. Réessayez dans quelques minutes.");
+          throw new Error(result.error ?? "Lien invalide ou expiré. Demandez-en un nouveau.");
+        }
         setSuccess(true); setMessage(result.message ?? "Mot de passe mis à jour.");
       }
     } catch (error) { setMessage(error instanceof Error ? error.message : "Service momentanément indisponible."); }
